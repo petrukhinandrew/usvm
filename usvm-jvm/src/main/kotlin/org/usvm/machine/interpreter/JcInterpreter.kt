@@ -374,6 +374,16 @@ class JcInterpreter(
                     return
                 }
 
+                if (method.isFinal) {
+                    // Case for approximated interfaces
+                    with (stmt) {
+                        scope.doWithState {
+                            newStmt(JcConcreteMethodCallInst(location, method, arguments, returnSite))
+                        }
+                    }
+                    return
+                }
+
                 resolveVirtualInvoke(stmt, scope)
             }
 
