@@ -19,6 +19,8 @@ import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.LinkedList
 import java.util.Queue
+import org.usvm.jvm.util.getFieldValue
+import org.usvm.jvm.util.setFieldValue
 
 //region Cell
 

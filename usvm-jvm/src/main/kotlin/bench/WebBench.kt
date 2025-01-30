@@ -67,6 +67,9 @@ import kotlin.system.measureNanoTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.nanoseconds
+import org.usvm.jvm.util.isSameSignature
+import org.usvm.jvm.util.replace
+import org.usvm.jvm.util.write
 
 private fun loadWebPetClinicBench(): BenchCp {
     val petClinicDir = Path("/Users/michael/Documents/Work/spring-petclinic/build/libs/BOOT-INF")
@@ -122,7 +125,7 @@ private class BenchCp(
     }
 }
 
-internal object JcLambdaFeature: JcClasspathExtFeature {
+internal object JcLambdaFeature : JcClasspathExtFeature {
 
     private val lambdaJcClassesByName: MutableMap<String, JcClassOrInterface> = mutableMapOf()
     private val lambdaClassesByName: MutableMap<String, Class<*>> = mutableMapOf()
@@ -143,7 +146,7 @@ internal object JcLambdaFeature: JcClasspathExtFeature {
     }
 }
 
-internal object JcClinitFeature: JcInstExtFeature {
+object JcClinitFeature : JcInstExtFeature {
 
     private fun shouldNotTransform(method: JcMethod, list: JcInstList<JcRawInst>): Boolean {
         return !method.isClassInitializer
@@ -178,14 +181,15 @@ internal object JcClinitFeature: JcInstExtFeature {
     }
 }
 
-private fun loadBench(db: JcDatabase, cpFiles: List<File>, classes: List<File>, dependencies: List<File>) = runBlocking {
-    val features = listOf(UnknownClasses, JcStringConcatTransformer, JcLambdaFeature, JcClinitFeature)
-    val cp = db.classpathWithApproximations(cpFiles, features)
+private fun loadBench(db: JcDatabase, cpFiles: List<File>, classes: List<File>, dependencies: List<File>) =
+    runBlocking {
+        val features = listOf(UnknownClasses, JcStringConcatTransformer, JcLambdaFeature, JcClinitFeature)
+        val cp = db.classpathWithApproximations(cpFiles, features)
 
-    val classLocations = cp.locations.filter { it.jarOrFolder in classes }
-    val depsLocations = cp.locations.filter { it.jarOrFolder in dependencies }
-    BenchCp(cp, db, classLocations, depsLocations, cpFiles, classes, dependencies)
-}
+        val classLocations = cp.locations.filter { it.jarOrFolder in classes }
+        val depsLocations = cp.locations.filter { it.jarOrFolder in dependencies }
+        BenchCp(cp, db, classLocations, depsLocations, cpFiles, classes, dependencies)
+    }
 
 private fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
     val springApproximationDeps =
@@ -228,7 +232,7 @@ private fun loadWebAppBenchCp(classes: List<Path>, dependencies: Path): BenchCp 
             .toList()
     )
 
-private val JcClassOrInterface.jvmDescriptor: String get() = "L${name.replace('.','/')};"
+private val JcClassOrInterface.jvmDescriptor: String get() = "L${name.replace('.', '/')};"
 
 private fun generateTestClass(benchmark: BenchCp): BenchCp {
     val dir = Path(System.getProperty("generatedDir"))

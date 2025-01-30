@@ -39,6 +39,10 @@ kotlin {
     }
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     implementation(Libs.jacodb_api_jvm) {
         // Unused dependencies
@@ -62,6 +66,9 @@ dependencies {
     implementation(Libs.ini4j)
     implementation(Libs.rd_core)
     implementation("commons-cli:commons-cli:1.5.0")
+//    implementation(Libs.rd_gen)
+    implementation(project(":usvm-jvm:usvm-jvm-test-api"))
+    implementation(project(":usvm-jvm:usvm-jvm-util"))
 
     rdgenModelsCompileClasspath(Libs.rd_gen)
 }
@@ -116,7 +123,10 @@ val runtimeClasspath = configurations.runtimeClasspath
 
 val instrumentationRunnerJar = tasks.register<ShadowJar>("instrumentationJar") {
     group = "jar"
+
     dependsOn.addAll(listOf("compileJava", "compileKotlin", "processResources"))
+    // TODO #Valya
+//    isZip64 = true
     archiveBaseName.set("usvm-jvm-instrumentation-runner")
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     manifest {
@@ -130,12 +140,13 @@ val instrumentationRunnerJar = tasks.register<ShadowJar>("instrumentationJar") {
         )
     }
 
+    configurations = listOf(project.configurations.runtimeClasspath.get())
     mergeServiceFiles()
 
-    val contents = runtimeClasspath.get()
-        .map { if (it.isDirectory) it else zipTree(it) }
-
-    from(contents)
+//    val contents = project.configurations.runtimeClasspath.get()
+//        .map { if (it.isDirectory) it else zipTree(it) }
+//
+//    from(contents)
     with(tasks.jar.get() as CopySpec)
 }
 

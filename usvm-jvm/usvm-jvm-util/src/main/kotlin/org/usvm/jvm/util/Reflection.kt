@@ -1,10 +1,9 @@
 @file:Suppress("DEPRECATION")
 
-package org.usvm.instrumentation.util
+package org.usvm.jvm.util
 
 import sun.misc.Unsafe
 import java.lang.reflect.*
-import java.util.concurrent.*
 
 
 object ReflectionUtils {
@@ -37,45 +36,6 @@ fun Field.getFieldValue(instance: Any?): Any? = with(ReflectionUtils.UNSAFE) {
         else -> getObject(fixedInstance, fieldOffset)
     }
 
-}
-
-fun Method.invokeWithAccessibility(instance: Any?, args: List<Any?>): Any? =
-    executeWithTimeout {
-        withAccessibility {
-            invoke(instance, *args.toTypedArray())
-        }
-    }
-
-fun Constructor<*>.newInstanceWithAccessibility(args: List<Any?>): Any =
-    executeWithTimeout {
-        withAccessibility {
-            newInstance(*args.toTypedArray())
-        }
-    } ?: error("Cant instantiate class ${this.declaringClass.name}")
-
-
-fun executeWithTimeout(body: () -> Any?): Any? {
-    var result: Any? = null
-    val thread = Thread {
-        result = try {
-            body()
-        } catch (e: Throwable) {
-            e
-        }
-    }
-    thread.start()
-    thread.join(InstrumentationModuleConstants.methodExecutionTimeout.inWholeMilliseconds)
-    var isThreadStopped = false
-    while (thread.isAlive) {
-        @Suppress("DEPRECATION")
-        thread.stop()
-        isThreadStopped = true
-    }
-    when {
-        isThreadStopped -> throw TimeoutException()
-        result is InvocationTargetException -> throw (result as InvocationTargetException).cause ?: result as Throwable
-        else -> return result
-    }
 }
 
 fun Field.setFieldValue(instance: Any?, fieldValue: Any?) = with(ReflectionUtils.UNSAFE) {
@@ -112,11 +72,12 @@ val Class<*>.allFields
         return result
     }
 
+// TODO: ask #Valya, #Misha
 fun Class<*>.getFieldByName(name: String): Field? {
     var result: Field?
     var current: Class<*> = this
     do {
-        result = `try` { current.getDeclaredField(name) }.getOrNull()
+        result = runCatching { current.getDeclaredField(name) }.getOrNull()
         current = current.superclass ?: break
     } while (result == null)
     return result

@@ -19,6 +19,12 @@ import org.usvm.instrumentation.collector.trace.MockCollector
 import org.usvm.instrumentation.instrumentation.JcInstructionTracer
 import org.usvm.instrumentation.instrumentation.TraceHelper
 import org.usvm.instrumentation.util.*
+import org.usvm.jvm.util.getTypename
+import org.usvm.jvm.util.isSameSignature
+import org.usvm.jvm.util.replace
+import org.usvm.jvm.util.stringType
+import org.usvm.jvm.util.toJavaClass
+import org.usvm.jvm.util.typename
 
 class MockHelper(val jcClasspath: JcClasspath, val classLoader: WorkerClassLoader) {
 
@@ -59,7 +65,8 @@ class MockHelper(val jcClasspath: JcClasspath, val classLoader: WorkerClassLoade
                     JcRawLabelInst(jcMethod, MOCK_END)
                 }
             } ?: JcRawLabelInst(jcMethod, MOCK_END)
-        val isMockedLocalVar = JcRawLocalVar(localVarIndexGenerator.nextLocalVarIndex(), IS_MOCKED, jcClasspath.boolean.getTypename())
+        val isMockedLocalVar =
+            JcRawLocalVar(localVarIndexGenerator.nextLocalVarIndex(), IS_MOCKED, jcClasspath.boolean.getTypename())
         val jcThisReference =
             if (jcMethod.isStatic || isGlobalMock) {
                 JcRawNullConstant(jcClass.typename)
@@ -81,7 +88,11 @@ class MockHelper(val jcClasspath: JcClasspath, val classLoader: WorkerClassLoade
         val mockRetValueLocalVar = if (mockTypeName.isPrimitive) {
             JcRawLocalVar(localVarIndexGenerator.nextLocalVarIndex(), MOCK_RETURN_VALUE_0, mockTypeName)
         } else {
-            JcRawLocalVar(localVarIndexGenerator.nextLocalVarIndex(), MOCK_RETURN_VALUE_0, jcClasspath.objectType.getTypename())
+            JcRawLocalVar(
+                localVarIndexGenerator.nextLocalVarIndex(),
+                MOCK_RETURN_VALUE_0,
+                jcClasspath.objectType.getTypename()
+            )
         }
         val mockRetValueVirtualCall = traceHelper.createMockCollectorCall(
             createGetMockValueMethodName(mockTypeName), mockedMethodId, jcThisReference
@@ -167,7 +178,8 @@ class MockHelper(val jcClasspath: JcClasspath, val classLoader: WorkerClassLoade
         oldInstructions.forEach { inst -> maxIndexFinder.visitOperands(inst.operands) }
         val localVarIndexGenerator = JcLocalVarIndexGenerator(maxIndexFinder.maxLocalVarIndex + 1)
 
-        val mockInstructions = addMockInvocationInJcdbInstructions(jcClass, jcMethod, mockedMethodId, isGlobalMock, localVarIndexGenerator)
+        val mockInstructions =
+            addMockInvocationInJcdbInstructions(jcClass, jcMethod, mockedMethodId, isGlobalMock, localVarIndexGenerator)
         return MethodNodeBuilder(
             method = jcMethod,
             instList = JcInstListImpl(mockInstructions + oldInstructions)
@@ -262,7 +274,7 @@ class MockHelper(val jcClasspath: JcClasspath, val classLoader: WorkerClassLoade
         val abstractMethods =
             (jcClass.declaredMethods + jcClass.allSuperHierarchy.flatMap { it.declaredMethods })
                 .filter { it.isAbstract }
-                .filterDuplicatesBy { it.jvmSignature }
+                .distinctBy { it.jvmSignature }
         for (jcMethod in abstractMethods) {
             val encodedMethodId = encodeMethod(jcMethod)
             val mockedMethod = addMockToAbstractMethod(jcMethod, encodedMethodId, classRebuilder)

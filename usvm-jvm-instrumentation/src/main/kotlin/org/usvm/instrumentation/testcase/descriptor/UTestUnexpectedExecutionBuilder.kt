@@ -20,10 +20,13 @@ class UTestUnexpectedExecutionBuilder(
         return when (exception) {
             is TimeoutCancellationException ->
                 UTestExecutionTimedOutResult(buildExceptionDescriptor(exception.message ?: "timeout"))
+
             is CancellationException ->
                 UTestExecutionFailedResult(buildExceptionDescriptor("CancellationException"))
+
             is RdFault ->
                 UTestExecutionFailedResult(buildExceptionDescriptor(exception.reasonAsText))
+
             else ->
                 error("Unexpected exception")
         }

@@ -1,46 +1,8 @@
-package org.usvm.util
+package org.usvm.test.api
 
-import org.jacodb.api.jvm.JcClassOrInterface
-import org.jacodb.api.jvm.JcField
-import org.jacodb.api.jvm.JcMethod
-import org.jacodb.api.jvm.JcType
-import org.jacodb.api.jvm.ext.boolean
-import org.jacodb.api.jvm.ext.byte
-import org.jacodb.api.jvm.ext.char
-import org.jacodb.api.jvm.ext.double
-import org.jacodb.api.jvm.ext.float
-import org.jacodb.api.jvm.ext.int
-import org.jacodb.api.jvm.ext.long
-import org.jacodb.api.jvm.ext.objectType
-import org.jacodb.api.jvm.ext.short
-import org.jacodb.api.jvm.ext.toType
+import org.jacodb.api.jvm.*
+import org.jacodb.api.jvm.ext.*
 import org.usvm.api.decoder.DecoderApi
-import org.usvm.instrumentation.testcase.api.UTestArrayGetExpression
-import org.usvm.instrumentation.testcase.api.UTestArrayLengthExpression
-import org.usvm.instrumentation.testcase.api.UTestArraySetStatement
-import org.usvm.instrumentation.testcase.api.UTestBooleanExpression
-import org.usvm.instrumentation.testcase.api.UTestByteExpression
-import org.usvm.instrumentation.testcase.api.UTestCastExpression
-import org.usvm.instrumentation.testcase.api.UTestCharExpression
-import org.usvm.instrumentation.testcase.api.UTestClassExpression
-import org.usvm.instrumentation.testcase.api.UTestConstructorCall
-import org.usvm.instrumentation.testcase.api.UTestCreateArrayExpression
-import org.usvm.instrumentation.testcase.api.UTestDoubleExpression
-import org.usvm.instrumentation.testcase.api.UTestExpression
-import org.usvm.instrumentation.testcase.api.UTestFloatExpression
-import org.usvm.instrumentation.testcase.api.UTestGetFieldExpression
-import org.usvm.instrumentation.testcase.api.UTestGetStaticFieldExpression
-import org.usvm.instrumentation.testcase.api.UTestInst
-import org.usvm.instrumentation.testcase.api.UTestIntExpression
-import org.usvm.instrumentation.testcase.api.UTestLongExpression
-import org.usvm.instrumentation.testcase.api.UTestMethodCall
-import org.usvm.instrumentation.testcase.api.UTestNullExpression
-import org.usvm.instrumentation.testcase.api.UTestSetFieldStatement
-import org.usvm.instrumentation.testcase.api.UTestSetStaticFieldStatement
-import org.usvm.instrumentation.testcase.api.UTestShortExpression
-import org.usvm.instrumentation.testcase.api.UTestStaticMethodCall
-import org.usvm.instrumentation.testcase.api.UTestStringExpression
-import org.usvm.instrumentation.util.stringType
 import org.usvm.machine.JcContext
 
 class JcTestExecutorDecoderApi(
@@ -122,4 +84,8 @@ class JcTestExecutorDecoderApi(
 
     override fun castClass(type: JcClassOrInterface, obj: UTestExpression): UTestExpression =
         UTestCastExpression(obj, type.toType())
+}
+
+private fun JcClasspath.stringType(): JcType {
+    return findClassOrNull("java.lang.String")!!.toType()
 }

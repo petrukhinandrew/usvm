@@ -55,6 +55,6 @@ inline fun <T> LifetimeDefinition.terminateOnException(block: (Lifetime) -> T): 
 
 suspend fun Lifetime.awaitTermination() {
     val deferred = CompletableDeferred<Unit>()
-    onTermination { deferred.complete(Unit) }
+    onTermination { println("terminated");deferred.complete(Unit) }
     deferred.await()
 }
