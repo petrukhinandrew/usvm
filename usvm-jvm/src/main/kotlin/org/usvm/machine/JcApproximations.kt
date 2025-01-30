@@ -2,6 +2,11 @@ package org.usvm.machine
 
 import io.ksmt.utils.asExpr
 import io.ksmt.utils.uncheckedCast
+import java.util.*
+import kotlin.reflect.KFunction
+import kotlin.reflect.KFunction0
+import kotlin.reflect.KFunction1
+import kotlin.reflect.KFunction2
 import org.jacodb.api.jvm.JcAnnotation
 import org.jacodb.api.jvm.JcArrayType
 import org.jacodb.api.jvm.JcClassOrInterface
@@ -27,10 +32,8 @@ import org.jacodb.api.jvm.ext.byte
 import org.jacodb.api.jvm.ext.char
 import org.jacodb.api.jvm.ext.double
 import org.jacodb.api.jvm.ext.fields
-import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.findClassOrNull
 import org.jacodb.api.jvm.ext.findType
-import org.jacodb.api.jvm.ext.findTypeOrNull
 import org.jacodb.api.jvm.ext.float
 import org.jacodb.api.jvm.ext.ifArrayGetElementType
 import org.jacodb.api.jvm.ext.int
@@ -43,7 +46,6 @@ import org.jacodb.api.jvm.ext.short
 import org.jacodb.api.jvm.ext.toType
 import org.jacodb.api.jvm.ext.void
 import org.jacodb.impl.cfg.util.isPrimitive
-import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.usvm.UBoolExpr
 import org.usvm.UBv32Sort
 import org.usvm.UBvSort
@@ -77,49 +79,40 @@ import org.usvm.api.collection.ObjectMapCollectionApi.symbolicObjectMapSize
 import org.usvm.api.initializeArray
 import org.usvm.api.initializeArrayLength
 import org.usvm.api.makeNullableSymbolicRefSubtype
+import org.usvm.api.makeNullableSymbolicRefWithSameType
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.makeSymbolicRef
+import org.usvm.api.makeSymbolicRefSubtype
 import org.usvm.api.makeSymbolicRefWithSameType
-import org.usvm.api.mapTypeStream
+import org.usvm.api.mapTypeStreamNotNull
 import org.usvm.api.memcpy
 import org.usvm.api.objectTypeEquals
-import org.usvm.collection.array.length.UArrayLengthLValue
-import org.usvm.collection.field.UFieldLValue
-import org.usvm.machine.interpreter.JcExprResolver
-import org.usvm.machine.interpreter.JcStepScope
-import org.usvm.machine.state.JcState
-import org.usvm.machine.state.skipMethodInvocationWithValue
-import org.usvm.sizeSort
-import org.usvm.types.first
-import org.usvm.types.singleOrNull
-import org.usvm.util.allocHeapRef
-import org.usvm.util.write
-import kotlin.reflect.KFunction
-import kotlin.reflect.KFunction0
-import kotlin.reflect.KFunction1
-import kotlin.reflect.KFunction2
-import kotlin.reflect.jvm.javaMethod
-import org.usvm.api.makeNullableSymbolicRefWithSameType
-import org.usvm.api.makeSymbolicRefSubtype
-import org.usvm.api.mapTypeStreamNotNull
 import org.usvm.api.readArrayIndex
 import org.usvm.api.readArrayLength
 import org.usvm.api.readField
 import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.api.util.Reflection.toJavaClass
 import org.usvm.api.writeField
+import org.usvm.collection.array.length.UArrayLengthLValue
+import org.usvm.collection.field.UFieldLValue
 import org.usvm.getIntValue
-import org.usvm.instrumentation.util.toJavaClass
-import org.usvm.machine.state.concreteMemory.JcConcreteMemory
+import org.usvm.jvm.util.toJavaClass
+import org.usvm.machine.interpreter.JcExprResolver
+import org.usvm.machine.interpreter.JcStepScope
+import org.usvm.machine.state.JcState
 import org.usvm.machine.state.concreteMemory.allInstanceFields
 import org.usvm.machine.state.concreteMemory.classesOfLocations
 import org.usvm.machine.state.concreteMemory.isSpringController
 import org.usvm.machine.state.concreteMemory.javaName
 import org.usvm.machine.state.newStmt
+import org.usvm.machine.state.skipMethodInvocationWithValue
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
-import java.util.TreeMap
-import kotlin.collections.ArrayList
+import org.usvm.sizeSort
+import org.usvm.types.first
+import org.usvm.types.singleOrNull
+import org.usvm.util.allocHeapRef
+import org.usvm.util.write
 
 class JcMethodApproximationResolver(
     private val ctx: JcContext,
@@ -454,6 +447,7 @@ class JcMethodApproximationResolver(
                 for (field in fields) {
                     val fieldType = field.type
                     val fieldSort = ctx.typeToSort(fieldType)
+
                     @Suppress("UNCHECKED_CAST")
                     val symbolicValue = scope.makeSymbolicRefSubtype(fieldType)!! as UExpr<USort>
                     memory.writeField(objRef, field.field, fieldSort, symbolicValue, ctx.trueExpr)
@@ -658,7 +652,10 @@ class JcMethodApproximationResolver(
                 for (annotation in method.annotations) {
                     val kind =
                         when (annotation.name) {
-                            "org.springframework.web.bind.annotation.RequestMapping" -> getRequestMappingMethod(annotation)
+                            "org.springframework.web.bind.annotation.RequestMapping" -> getRequestMappingMethod(
+                                annotation
+                            )
+
                             "org.springframework.web.bind.annotation.GetMapping" -> "get"
                             "org.springframework.web.bind.annotation.PostMapping" -> "post"
                             "org.springframework.web.bind.annotation.PutMapping" -> "put"
@@ -764,6 +761,7 @@ class JcMethodApproximationResolver(
                 returnType is JcClassType || returnType is JcArrayType -> {
                     mockedValue = scope.makeNullableSymbolicRefSubtype(returnType)!!
                 }
+
                 else -> {
                     check(returnType is JcPrimitiveType)
                     mockedValue = scope.calcOnState { makeSymbolicPrimitive(ctx.typeToSort(returnType)) }
@@ -796,9 +794,11 @@ class JcMethodApproximationResolver(
                     }.first()
                 mockedValue = scope.makeSymbolicRef(concreteType)!!
             }
+
             returnType is JcClassType -> {
                 mockedValue = scope.makeSymbolicRef(returnType)!!
             }
+
             else -> {
                 check(returnType is JcPrimitiveType)
                 mockedValue = scope.calcOnState { makeSymbolicPrimitive(ctx.typeToSort(returnType)) }

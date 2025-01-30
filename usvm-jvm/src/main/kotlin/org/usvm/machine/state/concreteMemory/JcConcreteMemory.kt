@@ -48,7 +48,7 @@ import org.usvm.collections.immutable.implementations.immutableMap.UPersistentHa
 import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.collections.immutable.persistentHashMapOf
 import org.usvm.constraints.UTypeConstraints
-import org.usvm.instrumentation.util.toJavaClass
+import org.usvm.jvm.util.toJavaClass
 import org.usvm.machine.JcConcreteInvocationResult
 import org.usvm.machine.JcContext
 import org.usvm.machine.JcMethodCall
@@ -84,6 +84,9 @@ import org.usvm.util.typedField
 import org.usvm.utils.applySoftConstraints
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ExecutionException
+import org.usvm.jvm.util.setFieldValue
+import org.usvm.jvm.util.toJavaField
+import org.usvm.jvm.util.toJavaMethod
 
 //region Concrete Memory
 
@@ -321,13 +324,14 @@ class JcConcreteMemory private constructor(
                 method.isConstructor && method.enclosingClass.isAbstract ||
                         method.enclosingClass.isEnum && method.isConstructor ||
                         // Case for method, which exists only in approximations
-                        method is JcEnrichedVirtualMethod && !method.isClassInitializer && method.toJavaMethod == null ||
-                        method.humanReadableSignature.let {
-                            it.startsWith("org.usvm.api.") ||
-                                    it.startsWith("runtime.LibSLRuntime") ||
-                                    it.startsWith("generated.") ||
-                                    it.startsWith("stub.")
-                        } ||
+                        method is JcEnrichedVirtualMethod && !method.isClassInitializer
+//                        && method.toJavaMethod(JcConcreteMemoryClassLoader) == null
+                        || method.humanReadableSignature.let {
+                    it.startsWith("org.usvm.api.") ||
+                            it.startsWith("runtime.LibSLRuntime") ||
+                            it.startsWith("generated.") ||
+                            it.startsWith("stub.")
+                } ||
                         shouldNotInvoke(method)
                 )
     }
@@ -351,8 +355,14 @@ class JcConcreteMemory private constructor(
 
     private inner class JcConcretizer(
         state: JcState
-    ) : JcTestStateResolver<Any?>(state.ctx, state.models.first(), state.memory, state.callStack.lastMethod().toTypedMethod) {
-        override val decoderApi: JcTestInterpreterDecoderApi = JcTestInterpreterDecoderApi(ctx, JcConcreteMemoryClassLoader)
+    ) : JcTestStateResolver<Any?>(
+        state.ctx,
+        state.models.first(),
+        state.memory,
+        state.callStack.lastMethod().toTypedMethod
+    ) {
+        override val decoderApi: JcTestInterpreterDecoderApi =
+            JcTestInterpreterDecoderApi(ctx, JcConcreteMemoryClassLoader)
 
         override fun tryCreateObjectInstance(ref: UConcreteHeapRef, heapRef: UHeapRef): Any? {
             if (heapRef is UConcreteHeapRef) {
@@ -462,7 +472,7 @@ class JcConcreteMemory private constructor(
         // TODO: redo #CM
         statics.forEach { (field, value) ->
             if (!shouldNotConcretizeField(field)) {
-                val javaField = field.toJavaField
+                val javaField = field.toJavaField(JcConcreteMemoryClassLoader)
                 if (javaField != null) {
                     val typedField = field.typedField
                     val concretizedValue = jcConcretizer.withMode(ResolveMode.CURRENT) {

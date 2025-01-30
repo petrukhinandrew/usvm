@@ -10,8 +10,17 @@ import org.usvm.instrumentation.testcase.descriptor.StaticDescriptorsBuilder
 import org.usvm.instrumentation.util.*
 import java.lang.instrument.ClassDefinition
 import java.lang.instrument.Instrumentation
+import java.lang.reflect.Constructor
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 import java.security.CodeSource
 import java.security.SecureClassLoader
+import java.util.concurrent.TimeoutException
+import org.usvm.jvm.util.isFinal
+import org.usvm.jvm.util.isStatic
+import org.usvm.jvm.util.setFieldValue
+import org.usvm.jvm.util.toByteArray
+import org.usvm.jvm.util.withAccessibility
 
 /**
  * Worker classloader using as classloader in testing project
@@ -136,4 +145,43 @@ class WorkerClassLoader(
         override fun getBytes(): ByteArray = cachedBytes
     }
 
+}
+
+fun Method.invokeWithAccessibility(instance: Any?, args: List<Any?>): Any? =
+    executeWithTimeout {
+        withAccessibility {
+            invoke(instance, *args.toTypedArray())
+        }
+    }
+
+fun Constructor<*>.newInstanceWithAccessibility(args: List<Any?>): Any =
+    executeWithTimeout {
+        withAccessibility {
+            newInstance(*args.toTypedArray())
+        }
+    } ?: error("Cant instantiate class ${this.declaringClass.name}")
+
+
+fun executeWithTimeout(body: () -> Any?): Any? {
+    var result: Any? = null
+    val thread = Thread {
+        result = try {
+            body()
+        } catch (e: Throwable) {
+            e
+        }
+    }
+    thread.start()
+    thread.join(InstrumentationModuleConstants.methodExecutionTimeout.inWholeMilliseconds)
+    var isThreadStopped = false
+    while (thread.isAlive) {
+        @Suppress("DEPRECATION")
+        thread.stop()
+        isThreadStopped = true
+    }
+    when {
+        isThreadStopped -> throw TimeoutException()
+        result is InvocationTargetException -> throw (result as InvocationTargetException).cause ?: result as Throwable
+        else -> return result
+    }
 }

@@ -2,15 +2,24 @@ package org.usvm.instrumentation.instrumentation
 
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.JcMethod
-import org.jacodb.api.jvm.cfg.*
+import org.jacodb.api.jvm.cfg.AbstractFullRawExprSetCollector
+import org.jacodb.api.jvm.cfg.JcRawAssignInst
+import org.jacodb.api.jvm.cfg.JcRawExpr
+import org.jacodb.api.jvm.cfg.JcRawFieldRef
+import org.jacodb.api.jvm.cfg.JcRawInst
+import org.jacodb.api.jvm.cfg.JcRawLabelInst
+import org.jacodb.api.jvm.cfg.JcRawLineNumberInst
 import org.jacodb.api.jvm.ext.isEnum
 import org.jacodb.impl.cfg.MethodNodeBuilder
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 import org.usvm.instrumentation.collector.trace.TraceCollector
 import org.usvm.instrumentation.instrumentation.JcInstructionTracer.StaticFieldAccessType
-import org.usvm.instrumentation.util.isSameSignature
-import org.usvm.instrumentation.util.replace
+import org.usvm.instrumentation.rd.InstrumentedProcess
+import org.usvm.instrumentation.rd.StaticsRollbackStrategy
+import org.usvm.instrumentation.util.InstrumentationModuleConstants
+import org.usvm.jvm.util.isSameSignature
+import org.usvm.jvm.util.replace
 
 /**
  * Class for runtime instrumentation for jcdb instructions
@@ -76,24 +85,37 @@ class JcRuntimeTraceInstrumenter(
     override fun instrumentClass(classNode: ClassNode): ClassNode {
         val className = classNode.name.replace('/', '.')
         val jcClass = jcClasspath.findClassOrNull(className) ?: return classNode
+
+        val instrumentedClassesFeature =
+            jcClasspath.features?.filterIsInstance<InstrumentedProcess.InstrumentedClassesFeature>()?.singleOrNull()
+        if (instrumentedClassesFeature != null &&
+            !instrumentedClassesFeature.paths.contains(jcClass.declaration.location.path)
+        )
+            return classNode
+
+
         val asmMethods = classNode.methods
         val methodsToInstrument = if (jcClass.isEnum) {
             jcClass.declaredMethods.filterNot { it.isConstructor || it.isClassInitializer || it.name == "values" || it.name == "valueOf" }
         } else {
             jcClass.declaredMethods.filterNot { it.isConstructor || it.isClassInitializer }
         }
-        //Copy of clinit method to be able to rollback statics between executions!
-        //We are not able to call <clinit> method directly with reflection
-        asmMethods.find { it.name == "<clinit>" }?.let { clinitNode ->
-            val clinitCopy = MethodNode(9, GENERATED_CLINIT_NAME, "()V", null, emptyArray())
-            clinitNode.instructions.forEach { clinitCopy.instructions.add(it) }
-            asmMethods.add(0, clinitCopy)
-        }
+
         methodsToInstrument.forEach { jcMethod ->
             val asmMethod = asmMethods.find { jcMethod.isSameSignature(it) } ?: return@forEach
             val tracedMethod = instrumentMethod(jcMethod)
             asmMethods.replace(asmMethod, tracedMethod)
         }
+
+        //Copy of clinit method to be able to rollback statics between executions!
+        //We are not able to call <clinit> method directly with reflection
+        if (InstrumentationModuleConstants.testExecutorStaticsRollbackStrategy != StaticsRollbackStrategy.REINIT) return classNode;
+        asmMethods.find { it.name == "<clinit>" }?.let { clinitNode ->
+            val clinitCopy = MethodNode(9, GENERATED_CLINIT_NAME, "()V", null, emptyArray())
+            clinitNode.instructions.forEach { clinitCopy.instructions.add(it) }
+            asmMethods.add(0, clinitCopy)
+        }
+
         return classNode
     }
 

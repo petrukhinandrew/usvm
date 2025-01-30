@@ -30,19 +30,18 @@ import org.usvm.api.internal.ClinitHelper
 import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.api.util.Reflection.getFieldValue
 import org.usvm.api.util.Reflection.toJavaClass
-import org.usvm.api.util.Reflection.toJavaExecutable
-import org.usvm.instrumentation.util.isStatic
-import org.usvm.instrumentation.util.toJavaClass
-import org.usvm.instrumentation.util.setFieldValue as setFieldValueUnsafe
+import org.usvm.jvm.util.isStatic
 import org.usvm.machine.JcContext
 import org.usvm.util.name
-import java.lang.reflect.Executable
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 import java.lang.reflect.Proxy
 import java.nio.ByteBuffer
 import kotlin.reflect.jvm.javaField
 import kotlin.reflect.jvm.javaMethod
+import org.usvm.api.util.Reflection.withAccessibility
+import org.usvm.jvm.util.getFieldValue
+import org.usvm.jvm.util.setFieldValue
 
 @Suppress("RecursivePropertyAccessor")
 internal val JcClassType.allFields: List<JcTypedField>
@@ -76,16 +75,21 @@ internal val JcClassOrInterface.staticFields: List<JcField>
 internal val Class<*>.staticFields: List<Field>
     get() = safeDeclaredFields.filter { Modifier.isStatic(it.modifiers) }
 
-internal fun Field.getFieldValue(obj: Any): Any? {
-    check(!isStatic)
-    isAccessible = true
-    return get(obj)
-}
+// TODO: ask #Misha
+//internal fun Field.getFieldValue(obj: Any): Any? {
+//    check(!isStatic)
+//    isAccessible = true
+//    return get(obj)
+//}
 
 internal fun Field.getStaticFieldValue(): Any? {
     check(isStatic)
-    isAccessible = true
-    return get(null)
+    // TODO: ask #Misha
+    return withAccessibility(this) {
+        getFieldValue(null)
+    }
+//    isAccessible = true
+//    return get(null)
 //     TODO: null!! #CM #Valya
 //    return getFieldValueUnsafe(null)
 }
@@ -94,13 +98,18 @@ internal fun Field.setStaticFieldValue(value: Any?) {
     check(value !is PhysicalAddress)
 //    isAccessible = true
 //    set(null, value)
-    setFieldValueUnsafe(null, value)
+    // TODO: ask #Misha
+    withAccessibility(this) {
+        setFieldValue(null, value)
+    }
+//    setFieldValue(null, value)
 }
 
-internal val Field.isFinal: Boolean
-    get() = Modifier.isFinal(modifiers)
+// TODO: ask #Misha
+//internal val Field.isFinal: Boolean
+//    get() = Modifier.isFinal(modifiers)
 
-internal fun JcField.getFieldValue(obj: Any): Any? {
+internal fun JcField.getFieldValueConcrete(obj: Any): Any? {
     if (this is JcEnrichedVirtualField) {
         val javaField = obj.javaClass.allInstanceFields.find { it.name == name }!!
         return javaField.getFieldValue(obj)
@@ -109,11 +118,11 @@ internal fun JcField.getFieldValue(obj: Any): Any? {
     return this.getFieldValue(JcConcreteMemoryClassLoader, obj)
 }
 
-internal fun Field.setFieldValue(obj: Any, value: Any?) {
-    check(value !is PhysicalAddress)
-    isAccessible = true
-    set(obj, value)
-}
+//internal fun Field.setFieldValue(obj: Any, value: Any?) {
+//    check(value !is PhysicalAddress)
+//    isAccessible = true
+//    set(obj, value)
+//}
 
 internal val kotlin.reflect.KProperty<*>.javaName: String
     get() = this.javaField?.name ?: error("No java name for field $this")
@@ -154,11 +163,11 @@ internal fun <Value> Any.setArrayValue(index: Int, value: Value) {
     }
 }
 
-internal val JcField.toJavaField: Field?
-    get() = enclosingClass.toJavaClass(JcConcreteMemoryClassLoader).allFields.find { it.name == name }
+//internal val JcField.toJavaField: Field?
+//    get() = enclosingClass.toJavaClass(JcConcreteMemoryClassLoader).allFields.find { it.name == name }
 
-internal val JcMethod.toJavaMethod: Executable?
-    get() = this.toJavaExecutable(JcConcreteMemoryClassLoader)
+//internal val JcMethod.toJavaMethod: Executable?
+//    get() = this.toJavaExecutable(JcConcreteMemoryClassLoader)
 
 internal val JcMethod.toTypedMethod: JcTypedMethod
     get() = enclosingClass.toType().declaredMethods.find { this == it.method }!!

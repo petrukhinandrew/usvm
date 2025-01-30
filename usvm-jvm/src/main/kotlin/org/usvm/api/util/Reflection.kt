@@ -1,5 +1,9 @@
 package org.usvm.api.util
 
+import java.lang.reflect.Constructor
+import java.lang.reflect.Executable
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import org.jacodb.api.jvm.JcArrayType
 import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcClassType
@@ -19,11 +23,10 @@ import org.jacodb.api.jvm.ext.long
 import org.jacodb.api.jvm.ext.short
 import org.jacodb.api.jvm.ext.toType
 import org.jacodb.api.jvm.ext.void
+import org.usvm.api.util.JcClassLoader.loadClass
+import org.usvm.jvm.util.getFieldValue
+import org.usvm.jvm.util.setFieldValue
 import sun.misc.Unsafe
-import java.lang.reflect.Constructor
-import java.lang.reflect.Executable
-import java.lang.reflect.Field
-import java.lang.reflect.Method
 
 /**
  * An util class encapsulating reflection usage.
@@ -133,15 +136,13 @@ object Reflection {
     fun JcField.getFieldValue(classLoader: ClassLoader, instance: Any?): Any? {
         val javaField = toJavaField(classLoader)
         return withAccessibility(javaField) {
-            javaField.get(instance)
+            javaField.getFieldValue(instance)
         }
     }
 
     fun JcField.setFieldValue(classLoader: ClassLoader, instance: Any?, value: Any?) {
         val javaField = toJavaField(classLoader)
-        return withAccessibility(javaField) {
-            javaField.set(instance, value)
-        }
+        withAccessibility(javaField) { javaField.setFieldValue(instance, value) }
     }
 
     fun JcMethod.invoke(classLoader: ClassLoader, instance: Any?, args: List<Any?>): Any? =
@@ -202,7 +203,7 @@ object Reflection {
         return "$name($parameterTypes)$returnType;"
     }
 
-    private inline fun <T> withAccessibility(field: Field, block: () -> T): T {
+    inline fun <T> withAccessibility(field: Field, block: () -> T): T {
         field.isAccessible = true
         return block()
     }

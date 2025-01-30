@@ -3,7 +3,6 @@
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
-import kotlin.io.path.createDirectory
 
 
 plugins {
@@ -47,12 +46,14 @@ repositories {
 dependencies {
     implementation(project(":usvm-core"))
     implementation(project(":usvm-jvm-dataflow"))
+    implementation(project(":usvm-jvm:usvm-jvm-util"))
 
     implementation(Libs.jacodb_api_jvm)
     implementation(Libs.jacodb_core)
     implementation(Libs.jacodb_approximations)
 
     implementation(`usvm-api`.output)
+    testImplementation(project("usvm-jvm-test-api"))
 
     implementation(Libs.ksmt_runner)
     implementation(Libs.ksmt_yices)
@@ -85,6 +86,7 @@ dependencies {
 val `usvm-apiCompileOnly`: Configuration by configurations.getting
 dependencies {
     `usvm-apiCompileOnly`(Libs.jacodb_api_jvm)
+    implementation(project(":usvm-jvm:usvm-jvm-util"))
 }
 
 val samplesImplementation: Configuration by configurations.getting
@@ -99,7 +101,6 @@ dependencies {
     // Use usvm-api in samples for makeSymbolic, assume, etc.
     samplesImplementation(`usvm-api`.output)
 
-    implementation(project(":usvm-jvm-instrumentation"))
     testImplementation(project(":usvm-jvm-instrumentation"))
 }
 

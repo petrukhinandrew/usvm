@@ -8,13 +8,13 @@ import org.usvm.UExpr
 import org.usvm.USort
 import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.collections.immutable.internal.MutabilityOwnership
+import org.usvm.jvm.util.toJavaField
 import org.usvm.machine.interpreter.statics.JcStaticFieldLValue
 import org.usvm.machine.interpreter.statics.JcStaticFieldRegionId
 import org.usvm.machine.interpreter.statics.JcStaticFieldsMemoryRegion
 import org.usvm.machine.interpreter.statics.staticFieldsInitializedFlagField
 import org.usvm.machine.state.concreteMemory.Marshall
 import org.usvm.machine.state.concreteMemory.getStaticFieldValue
-import org.usvm.machine.state.concreteMemory.toJavaField
 import org.usvm.util.typedField
 
 internal class JcConcreteStaticFieldsRegion<Sort : USort>(
@@ -33,7 +33,7 @@ internal class JcConcreteStaticFieldsRegion<Sort : USort>(
 
         check(JcConcreteMemoryClassLoader.isLoaded(field.enclosingClass))
         val fieldType = field.typedField.type
-        val javaField = field.toJavaField!!
+        val javaField = field.toJavaField(JcConcreteMemoryClassLoader)!!
         val value = javaField.getStaticFieldValue()
         // TODO: differs from jcField.getFieldValue(JcConcreteMemoryClassLoader, null) #CM
 //        val value = field.getFieldValue(JcConcreteMemoryClassLoader, null)

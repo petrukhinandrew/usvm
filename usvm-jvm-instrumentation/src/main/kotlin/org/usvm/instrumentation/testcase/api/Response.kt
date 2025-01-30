@@ -16,7 +16,7 @@ sealed class UTestExecutionResult
  */
 data class UTestExecutionFailedResult(
     val cause: UTestExceptionDescriptor
-): UTestExecutionResult()
+) : UTestExecutionResult()
 
 /**
  * Execution timeout
@@ -24,7 +24,7 @@ data class UTestExecutionFailedResult(
  */
 data class UTestExecutionTimedOutResult(
     val cause: UTestExceptionDescriptor
-): UTestExecutionResult()
+) : UTestExecutionResult()
 
 /**
  * In case of problems in execution problems (serialization/deserialization errors or UTestExpression execution error)
@@ -34,7 +34,7 @@ data class UTestExecutionTimedOutResult(
 data class UTestExecutionInitFailedResult(
     val cause: UTestExceptionDescriptor,
     val trace: List<JcInst>?
-): UTestExecutionResult()
+) : UTestExecutionResult()
 
 /**
  * Everything fine
@@ -48,7 +48,7 @@ data class UTestExecutionSuccessResult(
     val result: UTestValueDescriptor?,
     val initialState: UTestExecutionState,
     val resultState: UTestExecutionState
-): UTestExecutionResult()
+) : UTestExecutionResult()
 
 /**
  * In case with analyzing program threw exception
@@ -60,7 +60,7 @@ data class UTestExecutionExceptionResult(
     val trace: List<JcInst>?,
     val initialState: UTestExecutionState,
     val resultState: UTestExecutionState
-): UTestExecutionResult()
+) : UTestExecutionResult()
 
 /**
  * Description of program state before and after method execution

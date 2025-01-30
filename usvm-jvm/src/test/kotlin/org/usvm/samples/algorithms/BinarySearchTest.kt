@@ -7,6 +7,7 @@ import org.usvm.test.util.checkers.ignoreNumberOfAnalysisResults
 import org.usvm.util.isException
 
 class BinarySearchTest : JavaMethodTestRunner() {
+
     @Test
     fun testLeftBinarySearch() {
         checkDiscoveredPropertiesWithExceptions(

@@ -5,16 +5,16 @@ import org.jacodb.api.jvm.JcClassType
 import org.jacodb.impl.features.classpaths.JcUnknownType
 import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.api.util.Reflection.allocateInstance
-import org.usvm.instrumentation.util.getFieldValue
+import org.usvm.jvm.util.getFieldValue
 import org.usvm.machine.JcContext
 import java.lang.reflect.Field
 import java.util.LinkedList
 import java.util.Queue
 import kotlin.math.min
-import org.usvm.instrumentation.util.getFieldValue as getFieldValueUnsafe
-import org.usvm.instrumentation.util.setFieldValue as setFieldValueUnsafe
+import org.usvm.jvm.util.isFinal
+import org.usvm.jvm.util.setFieldValue
 
-internal interface ThreadLocalHelper {
+interface ThreadLocalHelper {
     fun getThreadLocalValue(threadLocal: Any): Any?
     fun setThreadLocalValue(threadLocal: Any, value: Any?)
     fun checkIsPresent(threadLocal: Any): Boolean
@@ -71,15 +71,17 @@ private class JcConcreteSnapshot(
                         else -> error("cloneObject: unexpected array $obj")
                     }
                 }
+
                 type.allInstanceFields.isEmpty() -> null
                 jcType is JcClassType -> {
                     val newObj = jcType.allocateInstance(JcConcreteMemoryClassLoader)
                     for (field in type.allInstanceFields) {
-                        val value = field.getFieldValueUnsafe(obj)
-                        field.setFieldValueUnsafe(newObj, value)
+                        val value = field.getFieldValue(obj)
+                        field.setFieldValue(newObj, value)
                     }
                     newObj
                 }
+
                 else -> null
             }
         } catch (e: Exception) {
@@ -239,47 +241,56 @@ private class JcConcreteSnapshotSequence(
                                 oldObj[i] = v
                             }
                         }
+
                         obj is ByteArray && oldObj is ByteArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is CharArray && oldObj is CharArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is LongArray && oldObj is LongArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is FloatArray && oldObj is FloatArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is ShortArray && oldObj is ShortArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is DoubleArray && oldObj is DoubleArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is BooleanArray && oldObj is BooleanArray -> {
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         obj is Array<*> && oldObj is Array<*> -> {
                             oldObj as Array<Any?>
                             obj.forEachIndexed { i, v ->
                                 oldObj[i] = v
                             }
                         }
+
                         else -> error("applyBacktrack: unexpected array $obj")
                     }
                 }
@@ -288,7 +299,7 @@ private class JcConcreteSnapshotSequence(
                     for (field in type.allInstanceFields) {
                         try {
                             val value = field.getFieldValue(obj)
-                            field.setFieldValueUnsafe(oldObj, value)
+                            field.setFieldValue(oldObj, value)
                         } catch (e: Exception) {
                             error("applyBacktrack class ${type.name} failed on field ${field.name}, cause: ${e.message}")
                         }
@@ -445,7 +456,7 @@ private class JcConcreteEffectSequence private constructor(
 
 // TODO: do not store effects of new addresses! #CM
 //  Optimize: check if address is allocated during current effect: maybe instrumentation of Object<init>?
-internal class JcConcreteEffectStorage private constructor(
+class JcConcreteEffectStorage private constructor(
     private val ctx: JcContext,
     private val threadLocalHelper: ThreadLocalHelper,
     private val own: JcConcreteEffectSequence,

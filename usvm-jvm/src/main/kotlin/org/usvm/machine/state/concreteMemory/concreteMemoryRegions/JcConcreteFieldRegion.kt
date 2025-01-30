@@ -8,6 +8,7 @@ import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.USort
+import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.collection.field.UFieldLValue
 import org.usvm.collection.field.UFieldsRegion
 import org.usvm.collection.field.UFieldsRegionId
@@ -16,8 +17,8 @@ import org.usvm.isTrue
 import org.usvm.machine.JcContext
 import org.usvm.machine.state.concreteMemory.JcConcreteMemoryBindings
 import org.usvm.machine.state.concreteMemory.Marshall
-import org.usvm.machine.state.concreteMemory.getFieldValue
-import org.usvm.machine.state.concreteMemory.toJavaField
+import org.usvm.jvm.util.toJavaField
+import org.usvm.machine.state.concreteMemory.getFieldValueConcrete
 import org.usvm.memory.UMemoryRegion
 import org.usvm.util.typedField
 
@@ -31,7 +32,7 @@ internal class JcConcreteFieldRegion<Sort : USort>(
 ) : UFieldsRegion<JcField, Sort>, JcConcreteRegion {
 
     private val jcField by lazy { regionId.field }
-    private val javaField by lazy { jcField.toJavaField }
+    private val javaField by lazy { jcField.toJavaField(JcConcreteMemoryClassLoader) }
     private val isApproximation by lazy { javaField == null }
     //    private val isPrimitiveApproximation by lazy { isApproximation && jcField.name == "value" }
     private val sort by lazy { regionId.sort }
@@ -103,7 +104,7 @@ internal class JcConcreteFieldRegion<Sort : USort>(
     @Suppress("UNCHECKED_CAST")
     fun unmarshallField(ref: UConcreteHeapRef, obj: Any) {
         val lvalue = UFieldLValue(sort, ref, jcField)
-        val fieldObj = jcField.getFieldValue(obj)
+        val fieldObj = jcField.getFieldValueConcrete(obj)
         val rvalue = marshall.objToExpr<USort>(fieldObj, fieldType) as UExpr<Sort>
         writeToBase(lvalue, rvalue, ctx.trueExpr)
     }
