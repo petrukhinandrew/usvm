@@ -13,6 +13,8 @@ dependencies {
 //    implementation(task("usvm-api-jar").outputs.files.single())
     // TODO ask valya
     implementation("org.usvm:usvm-jvm-api:unspecified")
+
+
 }
 
 publishing {

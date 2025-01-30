@@ -4,20 +4,16 @@ import kotlinx.coroutines.runBlocking
 import org.jacodb.api.jvm.*
 import org.jacodb.impl.fs.BuildFolderLocation
 import org.jacodb.impl.fs.JarLocation
-import org.usvm.UExpr
 import org.usvm.api.JcCoverage
 import org.usvm.api.JcParametersState
 import org.usvm.api.JcTest
 import org.usvm.api.StaticFieldValue
 import org.usvm.api.util.JcTestResolver
-import org.usvm.api.util.JcTestStateResolver
-import org.usvm.api.util.JcTestStateResolver.ResolveMode
 import org.usvm.instrumentation.executor.UTestConcreteExecutor
 import org.usvm.instrumentation.testcase.api.UTestExecutionExceptionResult
 import org.usvm.instrumentation.testcase.api.UTestExecutionFailedResult
 import org.usvm.instrumentation.testcase.api.UTestExecutionSuccessResult
 import org.usvm.instrumentation.testcase.descriptor.Descriptor2ValueConverter
-import org.usvm.machine.JcContext
 import org.usvm.machine.state.JcState
 import org.usvm.test.api.*
 
@@ -60,10 +56,9 @@ class JcTestExecutor(
         val uTest = UTest.fromSnapshot(method, state)
 
         // move with UTest out of instrumentation
-//        val execResult = runBlocking {
-//            runner.executeAsync(uTest)
-//        }
-        val execResult = runBlocking { runner.executeAsync(uTest) }
+        val execResult = runBlocking {
+            runner.executeAsync(uTest)
+        }
         descriptor2ValueConverter.clear()
         val result =
             when (execResult) {

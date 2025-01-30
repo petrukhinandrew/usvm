@@ -2,13 +2,7 @@ package org.usvm.instrumentation.instrumentation
 
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.JcMethod
-import org.jacodb.api.jvm.cfg.AbstractFullRawExprSetCollector
-import org.jacodb.api.jvm.cfg.JcRawAssignInst
-import org.jacodb.api.jvm.cfg.JcRawExpr
-import org.jacodb.api.jvm.cfg.JcRawFieldRef
-import org.jacodb.api.jvm.cfg.JcRawInst
-import org.jacodb.api.jvm.cfg.JcRawLabelInst
-import org.jacodb.api.jvm.cfg.JcRawLineNumberInst
+import org.jacodb.api.jvm.cfg.*
 import org.jacodb.api.jvm.ext.isEnum
 import org.jacodb.impl.cfg.MethodNodeBuilder
 import org.objectweb.asm.tree.ClassNode
@@ -18,8 +12,8 @@ import org.usvm.instrumentation.instrumentation.JcInstructionTracer.StaticFieldA
 import org.usvm.instrumentation.rd.InstrumentedProcess
 import org.usvm.instrumentation.rd.StaticsRollbackStrategy
 import org.usvm.instrumentation.util.InstrumentationModuleConstants
-import org.usvm.jvm.util.isSameSignature
-import org.usvm.jvm.util.replace
+import org.usvm.instrumentation.util.isSameSignature
+import org.usvm.instrumentation.util.replace
 
 /**
  * Class for runtime instrumentation for jcdb instructions
@@ -83,17 +77,13 @@ class JcRuntimeTraceInstrumenter(
     }
 
     override fun instrumentClass(classNode: ClassNode): ClassNode {
+        // TODO
+        val observedClassesFeature =
+            jcClasspath.features?.filterIsInstance<InstrumentedProcess.ObservedClassesFeature>()?.singleOrNull()
+        if (observedClassesFeature != null && !observedClassesFeature.classes.contains(classNode.name)) return classNode
+
         val className = classNode.name.replace('/', '.')
         val jcClass = jcClasspath.findClassOrNull(className) ?: return classNode
-
-        val instrumentedClassesFeature =
-            jcClasspath.features?.filterIsInstance<InstrumentedProcess.InstrumentedClassesFeature>()?.singleOrNull()
-        if (instrumentedClassesFeature != null &&
-            !instrumentedClassesFeature.paths.contains(jcClass.declaration.location.path)
-        )
-            return classNode
-
-
         val asmMethods = classNode.methods
         val methodsToInstrument = if (jcClass.isEnum) {
             jcClass.declaredMethods.filterNot { it.isConstructor || it.isClassInitializer || it.name == "values" || it.name == "valueOf" }

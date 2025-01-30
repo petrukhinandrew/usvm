@@ -29,7 +29,6 @@ import java.io.File
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
-import org.jacodb.api.jvm.JcFeatureEvent
 
 
 //Main class for worker process
@@ -62,11 +61,10 @@ class InstrumentedProcess private constructor() {
     }
 
     fun start(args: Array<String>) = runBlocking {
-        println("at start")
         val options = Options()
         with(options) {
             addOption("cp", true, "Project class path")
-            addOption("ic", true, "Locations to be instrumented")
+            addOption("ic", true, "Classes to be instrumented")
             addOption("em", true, "UTestExecutor mode (res, state)")
             addOption("t", true, "Process timeout in seconds")
             addOption("p", true, "Rd port number")
@@ -74,7 +72,7 @@ class InstrumentedProcess private constructor() {
         val parser = DefaultParser()
         val cmd = parser.parse(options, args)
         val classPath = cmd.getOptionValue("cp") ?: error("Specify classpath")
-        val instrumentedLocations = cmd.getOptionValues("ic").toList()
+        val includedClasses = cmd.getOptionValues("ic").toList()
 
         val execMode = when (cmd.getOptionValue("em")) {
             "res" -> UTestExecMode.RESULT_ONLY
@@ -85,7 +83,7 @@ class InstrumentedProcess private constructor() {
             ?: error("Specify timeout in seconds")
         val port = cmd.getOptionValue("p").toIntOrNull() ?: error("Specify rd port number")
         val def = LifetimeDefinition()
-        initProcess(classPath, instrumentedLocations, execMode)
+        initProcess(classPath, includedClasses, execMode)
         def.terminateOnException {
             def.launch {
                 checkAliveLoop(def, timeout)
@@ -101,7 +99,7 @@ class InstrumentedProcess private constructor() {
         initProcess(classpath, listOf(), UTestExecMode.STATE)
     }
 
-    data class InstrumentedClassesFeature(val paths: List<String>) : JcClasspathFeature
+    data class ObservedClassesFeature(val classes: List<String>) : JcClasspathFeature
 
     private suspend fun initProcess(classpath: String, excludedClasses: List<String>, execMode: UTestExecMode) {
         fileClassPath = classpath.split(File.pathSeparatorChar).map { File(it) }
@@ -111,7 +109,7 @@ class InstrumentedProcess private constructor() {
             jre = File(InstrumentationModuleConstants.pathToJava)
             //persistent(location = "/home/.usvm/jcdb.db", clearOnStart = false)
         }
-        jcClasspath = db.classpath(fileClassPath, listOf(InstrumentedClassesFeature(excludedClasses)))
+        jcClasspath = db.classpath(fileClassPath, listOf(ObservedClassesFeature(excludedClasses)))
         serializationCtx = SerializationContext(jcClasspath)
         ucp = URLClassPathLoader(fileClassPath)
         uTestExecutor = when (execMode) {
