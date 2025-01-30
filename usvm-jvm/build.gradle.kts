@@ -35,6 +35,7 @@ dependencies {
     implementation(Libs.jacodb_approximations)
 
     implementation(`usvm-api`.output)
+    testImplementation(project("usvm-jvm-test-api"))
 
     implementation(Libs.ksmt_runner)
     implementation(Libs.ksmt_yices)

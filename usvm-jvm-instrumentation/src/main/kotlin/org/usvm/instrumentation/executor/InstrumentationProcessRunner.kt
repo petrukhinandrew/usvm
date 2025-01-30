@@ -4,7 +4,6 @@ import com.jetbrains.rd.framework.util.NetUtils
 import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.lifetime.isAlive
-import com.jetbrains.rd.util.spinUntil
 import org.jacodb.api.jvm.JcClasspath
 import org.usvm.instrumentation.instrumentation.JcInstrumenter
 import org.usvm.instrumentation.instrumentation.JcInstrumenterFactory
@@ -24,7 +23,8 @@ class InstrumentationProcessRunner(
     private val testingProjectClasspath: String,
     private val jcClasspath: JcClasspath,
     private val instrumentationClassFactory: KClass<out JcInstrumenterFactory<out JcInstrumenter>>,
-    private val executionOptions: UTestExecutionOptions = UTestExecutionOptions()
+    private val instrumentedClasses: List<String> = listOf(),
+    private val executionMode: InstrumentedProcess.UTestExecMode = InstrumentedProcess.UTestExecMode.STATE
 ) {
 
     private lateinit var rdProcessRunner: RdProcessRunner
@@ -57,8 +57,8 @@ class InstrumentationProcessRunner(
 
     private fun createWorkerProcessArgs(rdPort: Int): List<String> =
         listOf("-cp", testingProjectClasspath) +
-                listOf("-ic", executionOptions.instrumentedLocations.joinToString { "," }) +
-                listOf("-em", executionOptions.execMode.id) +
+                listOf("-ic", instrumentedClasses.joinToString { "," }) +
+                listOf("-em", executionMode.id) +
                 listOf("-t", "${InstrumentationModuleConstants.concreteExecutorProcessTimeout}") +
                 listOf("-p", "$rdPort")
 

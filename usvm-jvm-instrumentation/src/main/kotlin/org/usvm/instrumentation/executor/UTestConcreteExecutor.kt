@@ -15,9 +15,9 @@ import java.io.File
 import kotlin.reflect.KClass
 import kotlin.time.Duration
 
+// TODO class identificaton in JcMachineOptions (use bytecode location on parent side)
 data class UTestExecutionOptions(
-    // TODO add flag for when we want to collect instrumented classes from JcMachineOptions
-    val instrumentedLocations: List<String> = emptyList(),
+    val instrumentedClasses: List<String> = emptyList(),
     val execMode: InstrumentedProcess.UTestExecMode = InstrumentedProcess.UTestExecMode.STATE
 )
 
@@ -48,7 +48,8 @@ class UTestConcreteExecutor(
             testingProjectClasspath,
             jcClasspath,
             instrumentationClassFactory,
-            opts
+            opts.instrumentedClasses,
+            opts.execMode
         )
     private val uTestUnexpectedExecutionBuilder = UTestUnexpectedExecutionBuilder(jcClasspath)
 

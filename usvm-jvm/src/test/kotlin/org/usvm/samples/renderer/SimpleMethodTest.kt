@@ -9,7 +9,6 @@ import org.usvm.util.isException
 class SimpleMethodTest : JavaMethodTestRunner() {
 
     override val resolverType: JcTestResolverType get() = JcTestResolverType.CONCRETE_EXECUTOR
-
     @Test
     fun simpleTest() {
         checkDiscoveredPropertiesWithExceptions(
@@ -20,4 +19,5 @@ class SimpleMethodTest : JavaMethodTestRunner() {
             { instance, _, r -> instance.yExplicitGet() == 0 && r.isException<ArithmeticException>() }
         )
     }
+
 }

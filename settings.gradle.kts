@@ -1,16 +1,14 @@
 rootProject.name = "usvm"
 
 include("usvm-core")
-include("usvm-jvm")
 include("usvm-jvm:usvm-jvm-test-api")
-include("usvm-jvm:usvm-jvm-util")
+include("usvm-jvm")
 include("usvm-ts")
 include("usvm-util")
 include("usvm-jvm-instrumentation")
 include("usvm-sample-language")
 include("usvm-dataflow")
 include("usvm-jvm-dataflow")
-include("usvm-dataflow-ts")
 
 include("usvm-python")
 include("usvm-python:cpythonadapter")
@@ -24,11 +22,6 @@ findProject(":usvm-python:usvm-python-runner")?.name = "usvm-python-runner"
 include("usvm-python:usvm-python-commons")
 findProject(":usvm-python:usvm-python-commons")?.name = "usvm-python-commons"
 
-// Actually, `includeBuild("../jacodb")` is enough, but there is a bug in IDEA when path is a symlink.
-// As a workaround, we convert it to a real absolute path.
-// See IDEA bug: https://youtrack.jetbrains.com/issue/IDEA-329756
-// includeBuild(file("../jacodb").toPath().toRealPath().toAbsolutePath())
-
 pluginManagement {
     resolutionStrategy {
         eachPlugin {
@@ -38,9 +31,3 @@ pluginManagement {
         }
     }
 }
-include("usvm-jvm:usvm-jvm-reproducer")
-findProject(":usvm-jvm:usvm-jvm-reproducer")?.name = "usvm-jvm-reproducer"
-include("usvm-jvm:usvm-jvm-utils")
-findProject(":usvm-jvm:usvm-jvm-utils")?.name = "usvm-jvm-utils"
-include("usvm-jvm:usvm-jvm-utils")
-findProject(":usvm-jvm:usvm-jvm-utils")?.name = "usvm-jvm-utils"
