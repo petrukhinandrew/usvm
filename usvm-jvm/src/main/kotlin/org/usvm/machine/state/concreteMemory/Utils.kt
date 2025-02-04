@@ -29,9 +29,6 @@ import org.jacodb.impl.features.classpaths.JcUnknownType
 import org.usvm.api.internal.ClinitHelper
 import org.usvm.api.util.JcConcreteMemoryClassLoader
 import org.usvm.api.util.Reflection.toJavaExecutable
-import org.usvm.instrumentation.util.isStatic
-import org.usvm.instrumentation.util.getFieldValue as getFieldValueUnsafe
-import org.usvm.instrumentation.util.setFieldValue as setFieldValueUnsafe
 import org.usvm.machine.JcContext
 import org.usvm.util.name
 import java.lang.reflect.Executable
@@ -84,7 +81,7 @@ internal fun Field.getFieldValue(obj: Any): Any? {
         isAccessible = true
         get(obj)
     } catch (_: Throwable) {
-        getFieldValueUnsafe(obj)
+        getFieldValue(obj)
     }
 }
 private val forbiddenModificationClasses = setOf<Class<*>>(

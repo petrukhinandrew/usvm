@@ -20,4 +20,21 @@ class SimpleMethodTest : JavaMethodTestRunner() {
         )
     }
 
+    @Test
+    fun throwsIllegalStateTest() {
+        checkDiscoveredPropertiesWithExceptions(
+            SimpleMethod::throwsIllegalState,
+            ignoreNumberOfAnalysisResults,
+            {_, r -> r.exceptionOrNull() is IllegalStateException }
+        )
+    }
+    @Test
+    fun const10Test() {
+        checkDiscoveredPropertiesWithExceptions(
+            SimpleMethod::const10,
+            ignoreNumberOfAnalysisResults,
+            {_, r -> r.getOrNull() == 10}
+        )
+    }
+
 }

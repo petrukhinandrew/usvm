@@ -12,8 +12,8 @@ import org.usvm.instrumentation.instrumentation.JcInstructionTracer.StaticFieldA
 import org.usvm.instrumentation.rd.InstrumentedProcess
 import org.usvm.instrumentation.rd.StaticsRollbackStrategy
 import org.usvm.instrumentation.util.InstrumentationModuleConstants
-import org.usvm.instrumentation.util.isSameSignature
-import org.usvm.instrumentation.util.replace
+import org.usvm.jvm.util.isSameSignature
+import org.usvm.jvm.util.replace
 
 /**
  * Class for runtime instrumentation for jcdb instructions

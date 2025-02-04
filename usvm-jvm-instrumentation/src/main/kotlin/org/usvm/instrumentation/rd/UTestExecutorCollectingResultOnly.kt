@@ -113,7 +113,6 @@ class UTestExecutorCollectingResultOnly(jcClasspath: JcClasspath, ucp: URLClassP
             workerClassLoader.reset(accessedStaticsFields)
         }
 
-
         return UTestExecutionSuccessResult(
             trace.trace, methodInvocationResultDescriptor, emptyExecState, emptyExecState
         )

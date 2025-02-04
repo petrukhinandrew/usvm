@@ -54,7 +54,7 @@ import org.usvm.test.api.UTestShortExpression
 import org.usvm.test.api.UTestStatement
 import org.usvm.test.api.UTestStaticMethodCall
 import org.usvm.test.api.UTestStringExpression
-import org.usvm.instrumentation.util.stringType
+import org.usvm.jvm.util.stringType
 
 class UTestInstSerializer(private val ctx: SerializationContext) {
 

@@ -57,7 +57,7 @@ class InstrumentationProcessRunner(
 
     private fun createWorkerProcessArgs(rdPort: Int): List<String> =
         listOf("-cp", testingProjectClasspath) +
-                listOf("-ic", instrumentedClasses.joinToString { "," }) +
+                listOf("-ic", instrumentedClasses.joinToString(" ")) +
                 listOf("-em", executionMode.id) +
                 listOf("-t", "${InstrumentationModuleConstants.concreteExecutorProcessTimeout}") +
                 listOf("-p", "$rdPort")

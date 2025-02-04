@@ -34,7 +34,10 @@ val `usvm-api` by sourceSets.creating {
         srcDir("src/usvm-api/java")
     }
 }
-
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
 val approximations by configurations.creating
 val approximationsRepo = "org.usvm.approximations.java.stdlib"
 val approximationsVersion = "0.0.0"
@@ -86,6 +89,7 @@ dependencies {
 val `usvm-apiCompileOnly`: Configuration by configurations.getting
 dependencies {
     `usvm-apiCompileOnly`(Libs.jacodb_api_jvm)
+    implementation(project(":usvm-jvm:usvm-jvm-util"))
 }
 
 val samplesImplementation: Configuration by configurations.getting
@@ -187,7 +191,7 @@ tasks.withType<Test> {
         project(":usvm-jvm-instrumentation")
             .layout
             .buildDirectory
-            .file("libs/usvm-jvm-instrumentation-1.0.jar")
+            .file("libs/usvm-jvm-instrumentation-runner.jar")
             .get().asFile.absolutePath
     )
     environment(
@@ -195,7 +199,7 @@ tasks.withType<Test> {
         project(":usvm-jvm-instrumentation")
             .layout
             .buildDirectory
-            .file("libs/usvm-jvm-instrumentation-collectors.jar")
+                .file("libs/usvm-jvm-instrumentation-collectors.jar")
             .get().asFile.absolutePath
     )
 }
