@@ -2,6 +2,8 @@ rootProject.name = "usvm"
 
 include("usvm-core")
 include("usvm-jvm:usvm-jvm-test-api")
+include("usvm-jvm:usvm-jvm-util")
+include("usvm-jvm:usvm-jvm-reproducer")
 include("usvm-jvm")
 include("usvm-ts")
 include("usvm-util")

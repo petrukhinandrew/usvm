@@ -48,10 +48,11 @@ dependencies {
     implementation("commons-cli:commons-cli:1.5.0")
     implementation(Libs.rd_gen)
     implementation(project(":usvm-jvm:usvm-jvm-test-api"))
+    implementation(project(":usvm-jvm:usvm-jvm-util"))
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions {
+    compilerOptions {
         allWarningsAsErrors = false
     }
 }
@@ -100,6 +101,9 @@ val generateModels = tasks.register<RdGenTask>("generateProtocolModels") {
 val instrumentationRunnerJar = tasks.register<ShadowJar>("instrumentationJar") {
     group = "jar"
     dependsOn.addAll(listOf("compileJava", "compileKotlin", "processResources"))
+    repositories {
+        mavenLocal()
+    }
     archiveBaseName.set("usvm-jvm-instrumentation-runner")
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     manifest {

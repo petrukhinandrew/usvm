@@ -5,9 +5,6 @@ plugins {
 group = "org.usvm"
 version = "unspecified"
 
-repositories {
-    mavenCentral()
-}
 
 dependencies {
     implementation(Libs.jacodb_api_jvm) {
@@ -24,7 +21,6 @@ dependencies {
         exclude("com.zaxxer", "HikariCP")
         exclude("org.xerial", "sqlite-jdbc")
     }
-
     testImplementation(kotlin("test"))
 }
 

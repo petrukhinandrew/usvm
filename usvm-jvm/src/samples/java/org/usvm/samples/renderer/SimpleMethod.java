@@ -20,5 +20,13 @@ class SimpleMethod {
         else
             return a;
     }
+
+    public void throwsIllegalState() {
+        throw new IllegalStateException();
+    }
+
+    public int const10() {
+        return 10;
+    }
 }
 
