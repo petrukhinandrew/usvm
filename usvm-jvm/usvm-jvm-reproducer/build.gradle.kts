@@ -20,9 +20,13 @@ dependencies {
     implementation(Libs.jacodb_api_jvm)
     implementation(Libs.jacodb_core)
     implementation(Libs.jacodb_approximations)
+    implementation(Libs.slf4j_simple)
+    implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.3")
+
     testImplementation(kotlin("test"))
 }
-
 tasks.test {
     useJUnitPlatform()
 }
+
+

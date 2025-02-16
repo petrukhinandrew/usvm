@@ -1,5 +1,6 @@
 package org.usvm.test.api
 
+import io.ksmt.cache.structurallyEqual
 import org.jacodb.api.jvm.JcClassType
 import org.jacodb.api.jvm.JcType
 import org.jacodb.api.jvm.JcTypedMethod
@@ -24,6 +25,7 @@ class UTest(
             val model = state.models.first()
             val ctx = state.ctx
             val memoryScope = MemoryScope(ctx, model, state.memory, method)
+            
             return memoryScope.createUTest()
         }
 

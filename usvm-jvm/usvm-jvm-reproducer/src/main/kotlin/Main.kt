@@ -14,5 +14,5 @@ fun main() {
 //    logTime("Analysis ALL") {
 //        benchCp.use { analyzeBench(it) }
 //    }
-    JcMachine(JcClasspath())
+//    JcMachine(JcClasspath())
 }
