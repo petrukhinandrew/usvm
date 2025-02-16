@@ -6,6 +6,7 @@ import org.usvm.test.api.UTest
 import org.usvm.test.api.*
 import java.lang.IllegalArgumentException
 import kotlin.random.Random
+import org.usvm.jvm.util.stringType
 
 object UTestCreator {
 

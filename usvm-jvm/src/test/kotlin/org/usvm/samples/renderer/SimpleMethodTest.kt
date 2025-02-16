@@ -36,5 +36,4 @@ class SimpleMethodTest : JavaMethodTestRunner() {
             {_, r -> r.getOrNull() == 10}
         )
     }
-
 }

@@ -123,9 +123,9 @@ internal object JcLambdaFeature : JcClasspathExtFeature {
     }
 }
 
-private fun loadBench(db: JcDatabase, cpFiles: List<File>, classes: List<File>, dependencies: List<File>) =
+internal fun loadBench(db: JcDatabase, cpFiles: List<File>, classes: List<File>, dependencies: List<File>) =
     runBlocking {
-        val features = listOf(UnknownClasses, JcStringConcatTransformer, JcLambdaFeature, JcClinitFeature)
+        val features = listOf(UnknownClasses/*, JcStringConcatTransformer, JcLambdaFeature, JcClinitFeature*/)
         val cp = db.classpathWithApproximations(cpFiles, features)
 
         val classLocations = cp.locations.filter { it.jarOrFolder in classes }
@@ -133,7 +133,29 @@ private fun loadBench(db: JcDatabase, cpFiles: List<File>, classes: List<File>, 
         BenchCp(cp, db, classLocations, depsLocations, cpFiles, classes, dependencies)
     }
 
-private fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
+internal fun loadBenchClassesOnly(classes: List<File>): BenchCp = runBlocking {
+    val cpFiles = classes
+
+    val db = jacodb {
+        useProcessJavaRuntime()
+
+        persistenceImpl(JcRamErsSettings)
+
+        installFeatures(InMemoryHierarchy)
+        installFeatures(Usages)
+        installFeatures(Approximations)
+
+        loadByteCode(cpFiles)
+
+//        val persistenceLocation = classes.first().parentFile.resolve("jcdb.db")
+//        persistent(persistenceLocation.absolutePath)
+    }
+
+    db.awaitBackgroundJobs()
+    loadBench(db, cpFiles, classes, listOf())
+}
+
+internal fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
     val springApproximationDeps =
         System.getProperty("usvm.jvm.springApproximationsDeps.paths")
             .split(";")
@@ -176,7 +198,7 @@ private fun loadWebAppBenchCp(classes: List<Path>, dependencies: Path): BenchCp 
 
 private val JcClassOrInterface.jvmDescriptor: String get() = "L${name.replace('.', '/')};"
 
-private fun generateTestClass(benchmark: BenchCp): BenchCp {
+internal fun generateTestClass(benchmark: BenchCp): BenchCp {
     val dir = Path(System.getProperty("generatedDir"))
     dir.createDirectories()
     val cp = benchmark.cp

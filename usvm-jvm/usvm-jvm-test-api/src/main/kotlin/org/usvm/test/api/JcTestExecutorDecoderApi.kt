@@ -86,6 +86,6 @@ class JcTestExecutorDecoderApi(
         UTestCastExpression(obj, type.toType())
 }
 
-private fun JcClasspath.stringType(): JcType {
+internal fun JcClasspath.stringType(): JcType {
     return findClassOrNull("java.lang.String")!!.toType()
 }
