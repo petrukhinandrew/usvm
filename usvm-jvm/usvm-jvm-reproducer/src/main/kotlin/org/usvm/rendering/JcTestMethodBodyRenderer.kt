@@ -77,7 +77,7 @@ class JcTestMethodBodyRenderer(
     private val importManager: JcImportManager,
     private val typeTranslator: JcTypeTranslator
 ) {
-    val throwPool = mutableListOf<ClassOrInterfaceType>()
+    val throwPool = mutableSetOf<ClassOrInterfaceType>()
     var needUnsafe = false
 
     // TODO maybe create renderer for every utest
@@ -170,7 +170,7 @@ class JcTestMethodBodyRenderer(
                     typeTranslator.typeReprOf(this.clazz.toType()), MethodCallExpr(
                         NameExpr("UNSAFE"),
                         "allocateInstance",
-                        NodeList(listOf(ClassExpr(typeTranslator.typeReprOf(this.clazz.toType()))))
+                        NodeList(listOf(ClassExpr(typeTranslator.typeReprOf(this.clazz.toType(),false))))
                     )
                 ).also {
                     needUnsafe = true
@@ -185,7 +185,7 @@ class JcTestMethodBodyRenderer(
                 this.expr.toExpression()
             )
 
-            is UTestClassExpression -> ClassExpr(typeTranslator.typeReprOf(this.type))
+            is UTestClassExpression -> ClassExpr(typeTranslator.typeReprOf(this.type, false))
 
             is UTestBooleanExpression -> BooleanLiteralExpr(this.value)
             is UTestByteExpression -> IntegerLiteralExpr(this.value.toString())

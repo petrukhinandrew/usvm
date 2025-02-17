@@ -1,5 +1,6 @@
 package org.usvm.org.usvm.rendering
 
+import com.github.javaparser.ast.NodeList
 import com.github.javaparser.ast.type.ArrayType
 import com.github.javaparser.ast.type.ClassOrInterfaceType
 import com.github.javaparser.ast.type.PrimitiveType
@@ -9,22 +10,29 @@ import org.jacodb.api.jvm.JcArrayType
 import org.jacodb.api.jvm.JcClassType
 import org.jacodb.api.jvm.JcPrimitiveType
 import org.jacodb.api.jvm.JcType
+import org.jacodb.api.jvm.ext.toType
 import org.usvm.util.name
 
 class JcTypeTranslator(private val importManager: JcImportManager) {
 
-    fun typeReprOf(type: JcType): Type = when (type) {
+    fun typeReprOf(type: JcType, useSubst: Boolean = true): Type = when (type) {
         is JcPrimitiveType -> PrimitiveType(Primitive.byTypeName(type.typeName).get())
-        is JcArrayType -> ArrayType(typeReprOf(type.elementType))
-        is JcClassType -> typeReprOf(type)
-        else -> error("throw IllegalStateException()")
+        is JcArrayType -> ArrayType(typeReprOf(type.elementType, useSubst))
+        is JcClassType -> typeReprOf(type, useSubst)
+        else -> error("throw IllegalStateException() for ${type.typeName}")
     }
 
-    fun typeReprOf(type: JcClassType): ClassOrInterfaceType {
+    fun typeReprOf(type: JcClassType, useSubst: Boolean = true): ClassOrInterfaceType {
         importManager.tryAdd(type.name, type.jcClass.simpleName)
         return ClassOrInterfaceType(
-            type.outerType?.let { typeReprOf(it) }, type.name
-        )
+            type.outerType?.let { typeReprOf(it, false) }, type.name
+        ).apply {
+            if (useSubst && type.typeArguments.isNotEmpty()) {
+                this.setTypeArguments(NodeList(type.typeArguments.map {
+                    typeReprOf(it.jcClass.toType())
+                }))
+            }
+        }
     }
 }
 
