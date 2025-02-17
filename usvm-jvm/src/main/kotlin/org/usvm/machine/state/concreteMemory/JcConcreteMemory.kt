@@ -83,9 +83,8 @@ import org.usvm.util.typedField
 import org.usvm.utils.applySoftConstraints
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ExecutionException
-import org.usvm.jvm.util.setFieldValue
 import org.usvm.jvm.util.toJavaField
-import org.usvm.jvm.util.toJavaMethod
+
 
 //region Concrete Memory
 

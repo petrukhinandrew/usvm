@@ -38,6 +38,10 @@ import java.lang.reflect.Proxy
 import java.nio.ByteBuffer
 import kotlin.reflect.jvm.javaField
 import kotlin.reflect.jvm.javaMethod
+import org.usvm.jvm.util.isStatic
+import org.usvm.jvm.util.setFieldValue as setFieldValueUnsafe
+import org.usvm.jvm.util.getFieldValue as getFieldValueUnsafe
+
 
 @Suppress("RecursivePropertyAccessor")
 internal val JcClassType.allFields: List<JcTypedField>
@@ -75,15 +79,6 @@ internal val JcClassOrInterface.staticFields: List<JcField>
 internal val Class<*>.staticFields: List<Field>
     get() = safeDeclaredFields.filter { Modifier.isStatic(it.modifiers) }
 
-internal fun Field.getFieldValue(obj: Any): Any? {
-    check(!isStatic)
-    return try {
-        isAccessible = true
-        get(obj)
-    } catch (_: Throwable) {
-        getFieldValue(obj)
-    }
-}
 private val forbiddenModificationClasses = setOf<Class<*>>(
     java.lang.Class::class.java,
     java.lang.reflect.Field::class.java,
@@ -106,6 +101,25 @@ private val Class<*>.isForbiddenToModify: Boolean
 
 class ForbiddenModificationException(msg: String) : Exception(msg)
 
+internal fun Field.getFieldValue(obj: Any): Any? {
+    check(!isStatic)
+    return try {
+        isAccessible = true
+        get(obj)
+    } catch (_: Throwable) {
+        getFieldValueUnsafe(obj)
+    }
+}
+internal fun Field.getStaticFieldValue(): Any? {
+    check(isStatic)
+    return try {
+        isAccessible = true
+        get(null)
+    } catch (_: Throwable) {
+        getFieldValueUnsafe(null)
+    }
+}
+
 internal fun Field.setFieldValue(obj: Any, value: Any?) {
     check(!isStatic)
     check(value !is PhysicalAddress)
@@ -117,16 +131,6 @@ internal fun Field.setFieldValue(obj: Any, value: Any?) {
         set(obj, value)
     } catch (_: Throwable) {
         setFieldValueUnsafe(obj, value)
-    }
-}
-
-internal fun Field.getStaticFieldValue(): Any? {
-    check(isStatic)
-    return try {
-        isAccessible = true
-        get(null)
-    } catch (_: Throwable) {
-        getFieldValueUnsafe(null)
     }
 }
 

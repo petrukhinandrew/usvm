@@ -1,5 +1,10 @@
 package org.usvm.machine.state.concreteMemory
 
+import java.lang.reflect.Field
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.*
 import org.jacodb.api.jvm.JcArrayType
 import org.jacodb.api.jvm.JcClassType
 import org.jacodb.api.jvm.JcMethod
@@ -13,14 +18,6 @@ import org.usvm.api.util.Reflection.allocateInstance
 import org.usvm.api.util.Reflection.invoke
 import org.usvm.constraints.UTypeConstraints
 import org.usvm.machine.JcContext
-import java.lang.reflect.Field
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.util.LinkedList
-import java.util.Queue
-import org.usvm.jvm.util.getFieldValue
-import org.usvm.jvm.util.setFieldValue
 
 //region Cell
 
@@ -243,7 +240,7 @@ internal class JcConcreteMemoryBindings private constructor(
         return allConcrete
     }
 
-    private inner class ConcretenessTraversal: ObjectTraversal(threadLocalHelper, false) {
+    private inner class ConcretenessTraversal : ObjectTraversal(threadLocalHelper, false) {
         override fun skip(phys: PhysicalAddress, type: Class<*>): Boolean {
             return type.isSolid
         }
@@ -333,7 +330,7 @@ internal class JcConcreteMemoryBindings private constructor(
         return symbolicMembers
     }
 
-    private inner class IsActualTraversal: ObjectTraversal(threadLocalHelper, false) {
+    private inner class IsActualTraversal : ObjectTraversal(threadLocalHelper, false) {
         private var success = true
         private var childMap: childMapType? = null
 
@@ -397,6 +394,7 @@ internal class JcConcreteMemoryBindings private constructor(
                         if (childKind.field.getFieldValue(obj) !== value)
                             return false
                     }
+
                     is ArrayIndexChildKind -> {
                         check(obj is Array<*>)
                         if (obj[childKind.index] !== value)
@@ -644,7 +642,7 @@ internal class JcConcreteMemoryBindings private constructor(
     fun writeClassField(address: UConcreteHeapAddress, field: Field, value: Any?): Boolean {
         val obj = virtToPhys(address)
         if (state == State.MutableWithEffect)
-            // TODO: add to backtrack only one field #CM
+        // TODO: add to backtrack only one field #CM
             effectStorage.addObjectToEffect(obj)
 
         try {

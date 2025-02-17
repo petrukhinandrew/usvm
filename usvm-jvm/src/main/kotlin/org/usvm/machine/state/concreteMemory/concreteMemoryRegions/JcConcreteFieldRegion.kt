@@ -17,7 +17,7 @@ import org.usvm.machine.JcContext
 import org.usvm.machine.state.concreteMemory.JcConcreteMemoryBindings
 import org.usvm.machine.state.concreteMemory.Marshall
 import org.usvm.machine.state.concreteMemory.allInstanceFields
-import org.usvm.machine.state.concreteMemory.getFieldValue
+import org.usvm.jvm.util.getFieldValue
 import org.usvm.machine.state.concreteMemory.toJavaField
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.mapWithStaticAsConcrete
@@ -35,6 +35,7 @@ internal class JcConcreteFieldRegion<Sort : USort>(
     private val jcField by lazy { regionId.field }
     private val javaField by lazy { jcField.toJavaField }
     private val isApproximation by lazy { javaField == null }
+
     //    private val isPrimitiveApproximation by lazy { isApproximation && jcField.name == "value" }
     private val sort by lazy { regionId.sort }
     private val typedField: JcTypedField by lazy { jcField.typedField }

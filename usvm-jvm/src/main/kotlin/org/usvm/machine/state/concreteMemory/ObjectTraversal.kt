@@ -49,6 +49,7 @@ internal abstract class ObjectTraversal(
                     queue.add(valuePhys)
                     handleThreadLocal(currentPhys, valuePhys)
                 }
+
                 type.isArray -> {
                     handleArray(currentPhys, type)
 
@@ -63,6 +64,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is IntArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -70,6 +72,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is ByteArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -77,6 +80,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is CharArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -84,6 +88,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is LongArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -91,6 +96,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is FloatArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -98,6 +104,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is ShortArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -105,6 +112,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is DoubleArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -112,6 +120,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         is BooleanArray -> {
                             current.forEachIndexed { i, v ->
                                 val child = PhysicalAddress(v)
@@ -119,6 +128,7 @@ internal abstract class ObjectTraversal(
                                 queue.add(child)
                             }
                         }
+
                         else -> error("ObjectTraversal.traverse: unexpected array $current")
                     }
                 }

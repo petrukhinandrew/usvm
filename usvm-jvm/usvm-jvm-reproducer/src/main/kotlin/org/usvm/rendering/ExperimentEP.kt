@@ -50,7 +50,7 @@ class JcTestRenderRunner {
 
             val cp = bench.cp
             val className = "a.b.c.SampleA"
-            val methodName = "SomeMethod"
+            val methodName = "genericUsage"
             val method = cp.findClass(className)
                 .toType().declaredMethods.first { it.name == methodName }
             JcMachine(cp, UMachineOptions(), JcMachineOptions()).use { machine ->

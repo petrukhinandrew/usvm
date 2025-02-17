@@ -104,6 +104,7 @@ val instrumentationRunnerJar = tasks.register<ShadowJar>("instrumentationJar") {
     repositories {
         mavenLocal()
     }
+    isZip64 = true
     archiveBaseName.set("usvm-jvm-instrumentation-runner")
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     manifest {
