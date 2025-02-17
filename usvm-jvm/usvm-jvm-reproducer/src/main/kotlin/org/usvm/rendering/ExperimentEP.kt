@@ -26,19 +26,14 @@ import com.github.javaparser.ast.stmt.CatchClause
 import com.github.javaparser.ast.stmt.ExpressionStmt
 import com.github.javaparser.ast.stmt.TryStmt
 import com.github.javaparser.ast.type.ClassOrInterfaceType
-import com.github.javaparser.ast.type.ReferenceType
 import com.github.javaparser.printer.DefaultPrettyPrinter
 import java.io.File
-import java.lang.Exception
-import kotlin.io.path.Path
 import kotlin.use
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.packageName
 import org.jacodb.api.jvm.ext.toType
-import org.jooq.Block
-import org.objectweb.asm.tree.TryCatchBlockNode
 import org.usvm.UMachineOptions
 import org.usvm.machine.JcMachine
 import org.usvm.machine.JcMachineOptions
@@ -171,8 +166,8 @@ class JcSpringTestClassRenderer(
                 }
             }
             val testMethod = testClass.injectTestBy(t.meta)
-            val bodyConverter = JcTestMethodBodyConverter(importManager, JcTypeTranslator(importManager))
-            val testBody = bodyConverter.convert(t.test)
+            val bodyConverter = JcTestMethodBodyRenderer(importManager, JcTypeTranslator(importManager))
+            val testBody = bodyConverter.render(t.test)
             testMethod.setBody(testBody)
             bodyConverter.throwPool.forEach { exc ->
                 testMethod.addThrownException(exc)
@@ -265,6 +260,4 @@ class JcSpringTestClassRenderer(
 
     // TODO
     private fun MethodDeclaration.associatedWith(test: UTestWrapper<JcSpringTestMeta>): Boolean = false
-
-    //        this.name.asString() == test.meta.targetMethodName
 }
