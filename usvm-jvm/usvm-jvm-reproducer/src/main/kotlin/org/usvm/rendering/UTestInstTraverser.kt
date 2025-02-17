@@ -18,65 +18,65 @@ import org.usvm.test.api.UTestStaticMethodCall
 
 object UTestInstTraverser {
 
-    fun traverseExpr(expr: UTestInst, block: (UTestInst) -> Unit): Unit = block(expr).also {
+    fun traverseInst(expr: UTestInst, depth: Int = 0, block: (UTestInst, Int) -> Unit): Unit = block(expr, depth).also {
         when (expr) {
             is UTestArithmeticExpression -> {
-                traverseExpr(expr.lhv, block)
-                traverseExpr(expr.rhv, block)
+                traverseInst(expr.lhv, depth + 1, block)
+                traverseInst(expr.rhv, depth + 1, block)
             }
 
             is UTestArrayGetExpression -> {
-                traverseExpr(expr.arrayInstance, block)
-                traverseExpr(expr.index, block)
+                traverseInst(expr.arrayInstance, depth + 1, block)
+                traverseInst(expr.index, depth + 1, block)
             }
 
-            is UTestArrayLengthExpression -> traverseExpr(expr.arrayInstance, block)
+            is UTestArrayLengthExpression -> traverseInst(expr.arrayInstance, depth + 1, block)
             is UTestBinaryConditionExpression -> {
-                traverseExpr(expr.lhv, block)
-                traverseExpr(expr.rhv, block)
-                traverseExpr(expr.trueBranch, block)
-                traverseExpr(expr.elseBranch, block)
+                traverseInst(expr.lhv, depth + 1, block)
+                traverseInst(expr.rhv, depth + 1, block)
+                traverseInst(expr.trueBranch, depth + 1, block)
+                traverseInst(expr.elseBranch, depth + 1, block)
             }
 
             is UTestConstructorCall, is UTestStaticMethodCall -> {
-                expr.args.forEach { arg -> traverseExpr(arg, block) }
+                expr.args.forEach { arg -> traverseInst(arg, depth + 1, block) }
             }
 
             is UTestMethodCall -> {
-                traverseExpr(expr.instance, block)
-                expr.args.forEach { arg -> traverseExpr(arg, block) }
+                traverseInst(expr.instance, depth + 1, block)
+                expr.args.forEach { arg -> traverseInst(arg, depth + 1, block) }
             }
 
-            is UTestCastExpression -> traverseExpr(expr.expr, block)
+            is UTestCastExpression -> traverseInst(expr.expr, depth + 1, block)
             is UTestCreateArrayExpression -> {
-                traverseExpr(expr.size, block)
+                traverseInst(expr.size, depth + 1, block)
             }
 
             is UTestGetFieldExpression -> {
-                traverseExpr(expr.instance, block)
+                traverseInst(expr.instance, depth + 1, block)
             }
 
             is UTestArraySetStatement -> {
-                traverseExpr(expr.arrayInstance, block)
-                traverseExpr(expr.index, block)
-                traverseExpr(expr.setValueExpression, block)
+                traverseInst(expr.arrayInstance, depth + 1, block)
+                traverseInst(expr.index, depth + 1, block)
+                traverseInst(expr.setValueExpression, depth + 1, block)
             }
 
             is UTestBinaryConditionStatement -> {
-                traverseExpr(expr.lhv, block)
-                traverseExpr(expr.rhv, block)
+                traverseInst(expr.lhv, depth + 1, block)
+                traverseInst(expr.rhv, depth + 1, block)
 //                    traverseExpr(expr.trueBranch, block)
 //                    traverseExpr(expr.elseBranch, block)
             }
 
             is UTestSetFieldStatement -> {
-                traverseExpr(expr.instance, block)
-                traverseExpr(expr.value, block)
+                traverseInst(expr.instance, depth + 1, block)
+                traverseInst(expr.value, depth + 1, block)
 
             }
 
             is UTestSetStaticFieldStatement -> {
-                traverseExpr(expr.value, block)
+                traverseInst(expr.value, depth + 1, block)
             }
 
             else -> return@also
