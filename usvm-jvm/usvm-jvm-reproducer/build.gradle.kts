@@ -1,3 +1,5 @@
+import org.gradle.tooling.model.java.JavaRuntime
+
 plugins {
     id("usvm.kotlin-conventions")
 }
@@ -24,6 +26,22 @@ dependencies {
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.3")
 
     testImplementation(kotlin("test"))
+}
+tasks.register<JavaExec>("runRenderer") {
+    mainClass.set("org.usvm.jvm.rendering.JcTestRenderRunner")
+    classpath = sourceSets.main.get().runtimeClasspath
+    val instrumentationTask = project(":usvm-jvm-instrumentation").tasks.getByName("instrumentationJar")
+    val collectorTask = project(":usvm-jvm-instrumentation").tasks.getByName("collectorsJar")
+    println(instrumentationTask.outputs.files.single())
+    println(collectorTask.outputs.files.single())
+    environment(
+        "usvm-jvm-instrumentation-jar",
+        instrumentationTask.outputs.files.single()
+    )
+    environment(
+        "usvm-jvm-collectors-jar",
+        collectorTask.outputs.files.single()
+    )
 }
 tasks.test {
     useJUnitPlatform()

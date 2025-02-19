@@ -1,9 +1,9 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 import kotlin.math.max
 import org.jacodb.api.jvm.JcType
 import org.jacodb.api.jvm.ext.void
-import org.usvm.org.usvm.rendering.UTestInstTraverser.traverseInst
+import org.usvm.jvm.rendering.UTestInstTraverser.traverseInst
 import org.usvm.test.api.UTest
 import org.usvm.test.api.UTestExpression
 import org.usvm.test.api.UTestInst

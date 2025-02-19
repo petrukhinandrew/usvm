@@ -1,4 +1,4 @@
-package bench
+package org.usvm.jvm.reproducer
 
 import java.io.File
 import java.io.PrintStream

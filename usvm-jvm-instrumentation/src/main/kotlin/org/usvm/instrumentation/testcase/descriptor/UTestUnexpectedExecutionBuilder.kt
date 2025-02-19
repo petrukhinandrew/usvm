@@ -28,7 +28,7 @@ class UTestUnexpectedExecutionBuilder(
                 UTestExecutionFailedResult(buildExceptionDescriptor(exception.reasonAsText))
 
             else ->
-                error("Unexpected exception")
+                error("Unexpected exception ${exception.message}")
         }
     }
 

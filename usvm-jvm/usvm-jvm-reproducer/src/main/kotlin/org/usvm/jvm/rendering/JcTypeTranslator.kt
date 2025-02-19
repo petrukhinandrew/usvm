@@ -1,4 +1,4 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 import com.github.javaparser.ast.NodeList
 import com.github.javaparser.ast.type.ArrayType

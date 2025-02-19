@@ -1,4 +1,4 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 import org.usvm.test.api.UTestArithmeticExpression
 import org.usvm.test.api.UTestArrayGetExpression

@@ -1,6 +1,5 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
-import bench.loadBenchClassesOnly
 import com.github.javaparser.StaticJavaParser
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.Modifier
@@ -28,50 +27,9 @@ import com.github.javaparser.ast.stmt.TryStmt
 import com.github.javaparser.ast.type.ClassOrInterfaceType
 import com.github.javaparser.printer.DefaultPrettyPrinter
 import java.io.File
-import kotlin.use
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.JcMethod
-import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.packageName
-import org.jacodb.api.jvm.ext.toType
-import org.usvm.UMachineOptions
-import org.usvm.machine.JcMachine
-import org.usvm.machine.JcMachineOptions
-import org.usvm.test.api.UTest
-
-class JcTestRenderRunner {
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val bench =
-                loadBenchClassesOnly(
-                    listOf(File("/Users/petrukhinandrew/IdeaProjects/sandbox/build/classes/java/main"))
-                )
-
-            val cp = bench.cp
-            val className = "a.b.c.SampleA"
-            val methodName = "genericUsage"
-            val method = cp.findClass(className)
-                .toType().declaredMethods.first { it.name == methodName }
-            JcMachine(cp, UMachineOptions(), JcMachineOptions()).use { machine ->
-                val states = machine.analyze(method.method).map {
-                    UTest.fromSnapshot(method, it)
-                }.map {
-                    UTestWrapper(
-                        it, JcSpringTestMeta(
-                            "/Users/petrukhinandrew/IdeaProjects/sandbox/src/test/java",
-                            method.method, JcSpringTestKind.None
-                        )
-                    )
-                }
-                val manager = JcSpringTestRenderManager()
-                manager.render(cp, states)
-            }
-        }
-    }
-}
-
-data class UTestWrapper<TestMeta>(val test: UTest, val meta: TestMeta)
 
 enum class JcSpringTestKind {
     WebMVC,
@@ -85,20 +43,6 @@ data class JcSpringTestMeta(
     val testKind: JcSpringTestKind
 )
 
-interface UTestRenderManager<TestMeta> {
-    fun render(cp: JcClasspath, tests: List<UTestWrapper<TestMeta>>)
-}
-
-class JcSpringTestRenderManager : UTestRenderManager<JcSpringTestMeta> {
-    override fun render(cp: JcClasspath, tests: List<UTestWrapper<JcSpringTestMeta>>) {
-        val classes = tests.groupBy { wrapper -> wrapper.meta }
-        classes.forEach { cls ->
-            val renderer = JcSpringTestClassRenderer.loadFileOrCreateFor(cls.key)
-            renderer.renderToFile(cp, cls.value)
-
-        }
-    }
-}
 
 class JcSpringTestClassRenderer(
     private val cu: CompilationUnit,
@@ -118,13 +62,15 @@ class JcSpringTestClassRenderer(
                     File.separator
                 )
             )
-            return if (testFile.exists()) loadFromAndCheck(testFile, meta) else createAndInit(testFile, meta)
+            return if (testFile.exists()) loadFileAndValidate(testFile, meta) else createAndInit(testFile, meta)
         }
 
-        private fun loadFromAndCheck(file: File, meta: JcSpringTestMeta): JcSpringTestClassRenderer {
+        private fun loadFileAndValidate(file: File, meta: JcSpringTestMeta): JcSpringTestClassRenderer {
+            fun isValid(cu: CompilationUnit): Boolean =
+                cu.types.any { declaration -> declaration.name == SimpleName(meta.targetMethod.enclosingClass.simpleName + CLASS_NAME_SUFFIX) }
 
             val cu = StaticJavaParser.parse(file)
-            return if (cu.types.any { declaration -> declaration.name == SimpleName(meta.targetMethod.enclosingClass.simpleName + CLASS_NAME_SUFFIX) })
+            return if (isValid(cu))
                 JcSpringTestClassRenderer(
                     cu,
                     JcImportManager(cu.imports.map { it.name.asString() }),
@@ -150,7 +96,7 @@ class JcSpringTestClassRenderer(
         }
     }
 
-    fun renderToFile(cp: JcClasspath, tests: List<UTestWrapper<JcSpringTestMeta>>) {
+    fun renderToFile(cp: JcClasspath, tests: List<UTestRenderWrapper<JcSpringTestMeta>>) {
         val freshTestsPool = mutableListOf<MethodDeclaration>()
         var staticInit: BlockStmt? = null
         tests.forEach { t ->
@@ -259,5 +205,5 @@ class JcSpringTestClassRenderer(
     }
 
     // TODO
-    private fun MethodDeclaration.associatedWith(test: UTestWrapper<JcSpringTestMeta>): Boolean = false
+    private fun MethodDeclaration.associatedWith(test: UTestRenderWrapper<JcSpringTestMeta>): Boolean = false
 }

@@ -28,7 +28,6 @@ abstract class UTestExecutor(
     protected val ucp: URLClassPathLoader
 ) {
 
-
     fun executeUTest(uTest: UTest): UTestExecutionResult {
         when (InstrumentationModuleConstants.testExecutorStaticsRollbackStrategy) {
             StaticsRollbackStrategy.HARD -> workerClassLoader = createWorkerClassLoader()

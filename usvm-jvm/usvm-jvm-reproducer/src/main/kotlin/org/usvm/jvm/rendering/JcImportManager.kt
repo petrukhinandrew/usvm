@@ -1,4 +1,4 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 class JcImportManager(importList: List<String>) {
     constructor() : this(listOf())

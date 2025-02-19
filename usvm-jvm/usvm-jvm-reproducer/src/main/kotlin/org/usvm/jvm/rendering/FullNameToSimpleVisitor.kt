@@ -1,4 +1,4 @@
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 import com.github.javaparser.ast.expr.Name
 import com.github.javaparser.ast.expr.NameExpr
@@ -19,7 +19,8 @@ class FullNameToSimpleVisitor(private val fullNameToSimple: Map<String, String>)
             n.name = SimpleName(fullNameToSimple[n.name.identifier])
         return super.visit(n, arg)
     }
-    override fun visit (n: Name, arg: Unit): Visitable {
+
+    override fun visit(n: Name, arg: Unit): Visitable {
         if (fullNameToSimple.containsKey(n.identifier))
             n.identifier = fullNameToSimple[n.identifier]
         return super.visit(n, arg)

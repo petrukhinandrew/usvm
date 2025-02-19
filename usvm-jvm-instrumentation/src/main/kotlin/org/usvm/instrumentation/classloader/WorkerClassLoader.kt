@@ -32,7 +32,6 @@ class WorkerClassLoader(
     private val mockCollectorClassName: String,
     val jcClasspath: JcClasspath
 ) : SecureClassLoader(null) {
-
     private lateinit var instrumentation: Instrumentation
     var shouldInstrumentCurrentClass = true
     private val redefineQueue = ArrayList<Pair<Class<*>, ClassNode>>()

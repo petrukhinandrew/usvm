@@ -1,6 +1,6 @@
 @file:Suppress("DEPRECATION")
 
-package org.usvm.org.usvm.rendering
+package org.usvm.jvm.rendering
 
 import com.github.javaparser.StaticJavaParser
 import com.github.javaparser.ast.NodeList
