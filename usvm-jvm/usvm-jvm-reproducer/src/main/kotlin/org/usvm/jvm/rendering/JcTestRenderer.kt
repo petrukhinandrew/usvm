@@ -111,7 +111,7 @@ abstract class JcTestRenderer(val varNameManager: VarNameManager = IndexingNameM
         fun prepare(test: UTest) {}
         fun applyTo(expr: UTestExpression): UTestExpression = expr
         fun applyTo(stmt: UTestStatement): UTestStatement = stmt
-        fun postProcess(stmt: Statement): Statement = stmt
+        fun applyToRendered(stmt: Statement): Statement = stmt
     }
 
     open fun requireDeclarationOf(expr: UTestExpression): Boolean = false
@@ -127,7 +127,7 @@ abstract class JcTestRenderer(val varNameManager: VarNameManager = IndexingNameM
         })
 
         val statementsToRenderProcessed = statementsToRender.map { stmt ->
-            features.fold(stmt) { stmt, feat -> feat.postProcess(stmt) }
+            features.fold(stmt) { stmt, feat -> feat.applyToRendered(stmt) }
         }
         return BlockStmt(NodeList(statementsToRenderProcessed))
     }
