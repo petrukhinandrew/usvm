@@ -3,7 +3,7 @@ package bench
 import org.usvm.api.JcSpringTest
 import org.usvm.jvm.rendering.JcSpringTestKind
 import org.usvm.jvm.rendering.JcSpringTestMeta
-import org.usvm.jvm.rendering.JcSpringTestRenderManager
+import org.usvm.jvm.rendering.JcTestRenderManager
 import org.usvm.jvm.rendering.UTestRenderWrapper
 import org.usvm.machine.JcSpringMachine
 import org.usvm.machine.state.JcSpringState
@@ -15,7 +15,7 @@ class JcSpringTestGenMachineObserver(private val machine: JcSpringMachine) : UMa
         if (!stateReachable || state.reqSetup.size < 2) return
         try {
             val test = JcSpringTest.generateFromState(state)
-            JcSpringTestRenderManager().render(
+            JcTestRenderManager().render(
                 state.entrypoint.enclosingClass.classpath,
                 listOf(
                     UTestRenderWrapper(

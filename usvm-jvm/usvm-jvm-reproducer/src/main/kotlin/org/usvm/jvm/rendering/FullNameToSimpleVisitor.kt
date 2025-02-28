@@ -6,6 +6,7 @@ import com.github.javaparser.ast.expr.SimpleName
 import com.github.javaparser.ast.type.ClassOrInterfaceType
 import com.github.javaparser.ast.visitor.ModifierVisitor
 import com.github.javaparser.ast.visitor.Visitable
+import kotlin.jvm.optionals.getOrNull
 
 class FullNameToSimpleVisitor(private val fullNameToSimple: Map<String, String>) : ModifierVisitor<Unit>() {
     override fun visit(n: NameExpr, arg: Unit): Visitable {
@@ -15,8 +16,9 @@ class FullNameToSimpleVisitor(private val fullNameToSimple: Map<String, String>)
     }
 
     override fun visit(n: ClassOrInterfaceType, arg: Unit): Visitable {
-        if (fullNameToSimple.containsKey(n.name.identifier))
-            n.name = SimpleName(fullNameToSimple[n.name.identifier])
+        if (fullNameToSimple.containsKey(n.nameWithScope) || n.scope.getOrNull()?.asString() == "java.lang") {
+            n.removeScope()
+        }
         return super.visit(n, arg)
     }
 
