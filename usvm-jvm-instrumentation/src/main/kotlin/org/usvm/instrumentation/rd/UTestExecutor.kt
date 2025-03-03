@@ -20,9 +20,9 @@ import org.usvm.instrumentation.util.InstrumentationModuleConstants
 import org.usvm.instrumentation.util.URLClassPathLoader
 import java.lang.Exception
 
-class UTestExecutor(
-    private val jcClasspath: JcClasspath,
-    private val ucp: URLClassPathLoader
+abstract class UTestExecutor(
+    protected val jcClasspath: JcClasspath,
+    protected val ucp: URLClassPathLoader
 ) {
 
     private var workerClassLoader = createWorkerClassLoader()
@@ -30,7 +30,7 @@ class UTestExecutor(
         workerClassLoader = workerClassLoader,
         previousState = null
     )
-    private var staticDescriptorsBuilder = StaticDescriptorsBuilder(
+    protected var staticDescriptorsBuilder = StaticDescriptorsBuilder(
         workerClassLoader = workerClassLoader,
         initialValue2DescriptorConverter = initStateDescriptorBuilder
     )
@@ -144,7 +144,7 @@ class UTestExecutor(
         )
     }
 
-    private fun buildExceptionDescriptor(
+    protected fun buildExceptionDescriptor(
         builder: Value2DescriptorConverter,
         exception: Throwable,
         raisedByUserCode: Boolean
@@ -162,29 +162,10 @@ class UTestExecutor(
             )
     }
 
-    private fun buildExecutionState(
+    abstract protected fun buildExecutionState(
         callMethodExpr: UTestCall,
         executor: UTestExpressionExecutor,
         descriptorBuilder: Value2DescriptorConverter,
         accessedStatics: MutableSet<Pair<JcField, JcInstructionTracer.StaticFieldAccessType>>
-    ): UTestExecutionState = with(descriptorBuilder) {
-        uTestExecutorCache.addAll(executor.objectToInstructionsCache)
-        val instanceDescriptor = callMethodExpr.instance?.let {
-            buildDescriptorFromUTestExpr(it, executor).getOrNull()
-        }
-        val argsDescriptors = callMethodExpr.args.map {
-            buildDescriptorFromUTestExpr(it, executor).getOrNull()
-        }
-        val isInit = previousState == null
-        val statics = if (isInit) {
-            val descriptorsForInitializedStatics =
-                staticDescriptorsBuilder.buildDescriptorsForExecutedStatics(accessedStatics, descriptorBuilder).getOrThrow()
-            staticDescriptorsBuilder.builtInitialDescriptors.plus(descriptorsForInitializedStatics)
-                .filter { it.value != null }
-                .mapValues { it.value!! }
-        } else {
-            staticDescriptorsBuilder.buildDescriptorsForExecutedStatics(accessedStatics, descriptorBuilder).getOrThrow()
-        }
-        return UTestExecutionState(instanceDescriptor, argsDescriptors, statics.toMutableMap())
-    }
+    ): UTestExecutionState
 }

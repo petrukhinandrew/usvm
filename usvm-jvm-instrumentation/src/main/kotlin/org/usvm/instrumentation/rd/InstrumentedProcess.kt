@@ -29,6 +29,8 @@ import java.io.File
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
+import org.usvm.instrumentation.executor.UTestExecutorMode
+import org.usvm.instrumentation.instrumentation.JcInstrumentedClassesFeature
 
 
 //Main class for worker process
@@ -60,17 +62,24 @@ class InstrumentedProcess private constructor() {
         val options = Options()
         with(options) {
             addOption("cp", true, "Project class path")
+            addOption("ic", true, "Instrumented classes names")
+            addOption("em", true, "Executor mode (result, state)")
             addOption("t", true, "Process timeout in seconds")
             addOption("p", true, "Rd port number")
         }
         val parser = DefaultParser()
         val cmd = parser.parse(options, args)
         val classPath = cmd.getOptionValue("cp") ?: error("Specify classpath")
+        val instrumentedClassNames = cmd.getOptionValues("ic").toList()
+        val executorMode = when (cmd.getOptionValue("em")) {
+            "result" -> UTestExecutorMode.RESULT
+            else -> UTestExecutorMode.STATE
+        }
         val timeout = cmd.getOptionValue("t").toIntOrNull()?.toDuration(DurationUnit.SECONDS)
             ?: error("Specify timeout in seconds")
         val port = cmd.getOptionValue("p").toIntOrNull() ?: error("Specify rd port number")
         val def = LifetimeDefinition()
-        initProcess(classPath)
+        initProcess(classPath, instrumentedClassNames, executorMode)
         def.terminateOnException {
             def.launch {
                 checkAliveLoop(def, timeout)
@@ -82,7 +91,7 @@ class InstrumentedProcess private constructor() {
         }
     }
 
-    private suspend fun initProcess(classpath: String) {
+    private suspend fun initProcess(classpath: String, instrumentedClassNames: List<String>, executorMode: UTestExecutorMode) {
         fileClassPath = classpath.split(File.pathSeparatorChar).map { File(it) }
         val db = jacodb {
             persistenceImpl(JcRamErsSettings)
@@ -91,10 +100,13 @@ class InstrumentedProcess private constructor() {
             jre = File(InstrumentationModuleConstants.pathToJava)
             //persistent(location = "/home/.usvm/jcdb.db", clearOnStart = false)
         }
-        jcClasspath = db.classpath(fileClassPath)
+        jcClasspath = db.classpath(fileClassPath, features = listOf(JcInstrumentedClassesFeature(instrumentedClassNames)))
         serializationCtx = SerializationContext(jcClasspath)
         ucp = URLClassPathLoader(fileClassPath)
-        uTestExecutor = UTestExecutor(jcClasspath, ucp)
+        uTestExecutor = when (executorMode) {
+            UTestExecutorMode.RESULT -> UTestExecutorCollectingResult(jcClasspath, ucp)
+            UTestExecutorMode.STATE -> UTestExecutorCollectingState(jcClasspath, ucp)
+        }
     }
 
     private suspend fun initiate(lifetime: Lifetime, port: Int) {

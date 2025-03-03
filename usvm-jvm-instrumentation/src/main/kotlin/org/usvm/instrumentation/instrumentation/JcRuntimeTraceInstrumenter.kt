@@ -9,6 +9,8 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 import org.usvm.instrumentation.collector.trace.TraceCollector
 import org.usvm.instrumentation.instrumentation.JcInstructionTracer.StaticFieldAccessType
+import org.usvm.instrumentation.rd.StaticsRollbackStrategy
+import org.usvm.instrumentation.util.InstrumentationModuleConstants
 import org.usvm.jvm.util.isSameSignature
 import org.usvm.jvm.util.replace
 
@@ -26,6 +28,10 @@ class JcRuntimeTraceInstrumenter(
     private val traceHelper = TraceHelper(jcClasspath, TraceCollector::class.java)
     private val coveredInstructionMethodName = "jcInstructionCovered"
     private val staticFieldAccessedMethodName = "jcStaticFieldAccessed"
+    private val instrumentedClassNames =
+        jcClasspath.features?.filterIsInstance<JcInstrumentedClassesFeature>()?.singleOrNull()?.let {
+            if (it.classNames.isEmpty()) null else it.classNames
+        }
 
     override fun visitJcRawAssignInst(inst: JcRawAssignInst) {
         val lhv = inst.lhv
@@ -74,6 +80,7 @@ class JcRuntimeTraceInstrumenter(
     }
 
     override fun instrumentClass(classNode: ClassNode): ClassNode {
+        if (instrumentedClassNames?.contains(classNode.name) == false) return classNode
         val className = classNode.name.replace('/', '.')
         val jcClass = jcClasspath.findClassOrNull(className) ?: return classNode
         val asmMethods = classNode.methods
@@ -82,18 +89,20 @@ class JcRuntimeTraceInstrumenter(
         } else {
             jcClass.declaredMethods.filterNot { it.isConstructor || it.isClassInitializer }
         }
-        //Copy of clinit method to be able to rollback statics between executions!
-        //We are not able to call <clinit> method directly with reflection
-        asmMethods.find { it.name == "<clinit>" }?.let { clinitNode ->
-            val clinitCopy = MethodNode(9, GENERATED_CLINIT_NAME, "()V", null, emptyArray())
-            clinitNode.instructions.forEach { clinitCopy.instructions.add(it) }
-            asmMethods.add(0, clinitCopy)
-        }
         methodsToInstrument.forEach { jcMethod ->
             val asmMethod = asmMethods.find { jcMethod.isSameSignature(it) } ?: return@forEach
             val tracedMethod = instrumentMethod(jcMethod)
             asmMethods.replace(asmMethod, tracedMethod)
         }
+        //Copy of clinit method to be able to rollback statics between executions!
+        //We are not able to call <clinit> method directly with reflection
+        if (InstrumentationModuleConstants.testExecutorStaticsRollbackStrategy != StaticsRollbackStrategy.REINIT) return classNode
+        asmMethods.find { it.name == "<clinit>" }?.let { clinitNode ->
+            val clinitCopy = MethodNode(9, GENERATED_CLINIT_NAME, "()V", null, emptyArray())
+            clinitNode.instructions.forEach { clinitCopy.instructions.add(it) }
+            asmMethods.add(0, clinitCopy)
+        }
+
         return classNode
     }
 
