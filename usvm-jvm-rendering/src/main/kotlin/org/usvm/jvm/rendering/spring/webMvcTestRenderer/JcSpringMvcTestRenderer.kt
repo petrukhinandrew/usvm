@@ -3,8 +3,8 @@ package org.usvm.jvm.rendering.spring.webMvcTestRenderer
 import com.github.javaparser.ast.expr.AnnotationExpr
 import com.github.javaparser.ast.expr.SimpleName
 import org.usvm.jvm.rendering.baseRenderer.JcIdentifiersManager
+import org.usvm.jvm.rendering.spring.unitTestRenderer.JcSpringUnitTestRenderer
 import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeImportManager
-import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeTestRenderer
 import org.usvm.test.api.UTest
 
 open class JcSpringMvcTestRenderer(
@@ -14,7 +14,7 @@ open class JcSpringMvcTestRenderer(
     identifiersManager: JcIdentifiersManager,
     name: SimpleName,
     testAnnotation: AnnotationExpr,
-): JcUnsafeTestRenderer(
+): JcSpringUnitTestRenderer(
     test,
     classRenderer,
     importManager,
