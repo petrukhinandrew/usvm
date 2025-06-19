@@ -42,6 +42,9 @@ dependencies {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            groupId = "org.usvm"
+            artifactId = "usvm-jvm-api"
+            version = "1.2.10"
             from(components["java"])
         }
     }

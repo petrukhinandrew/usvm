@@ -3,8 +3,10 @@ package org.usvm.samples.rendering
 import org.junit.jupiter.api.Test
 import org.usvm.samples.JavaMethodTestRunner
 import org.usvm.test.util.checkers.ignoreNumberOfAnalysisResults
+import org.usvm.util.JcTestResolverType
 
 class GenericTypesRenderingTests: JavaMethodTestRunner() {
+    override val resolverType: JcTestResolverType = JcTestResolverType.CONCRETE_EXECUTOR
     @Test
     fun unboundedWildcardInUsageTest() {
         checkDiscoveredProperties(

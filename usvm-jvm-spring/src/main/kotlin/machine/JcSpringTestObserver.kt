@@ -6,9 +6,9 @@ import testGeneration.SpringTestInfo
 import testGeneration.canGenerateTest
 import testGeneration.generateTest
 
-class JcSpringTestObserver : UMachineObserver<JcSpringState> {
+open class JcSpringTestObserver : UMachineObserver<JcSpringState> {
 
-    private val tests = mutableListOf<SpringTestInfo>()
+    protected val tests = mutableListOf<SpringTestInfo>()
 
     override fun onStateTerminated(state: JcSpringState, stateReachable: Boolean) {
         if (!stateReachable || !state.canGenerateTest()) return

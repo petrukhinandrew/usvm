@@ -52,7 +52,7 @@ dependencies {
     testImplementation(Libs.logback)
 
     testImplementation(samples.output)
-
+    testImplementation(project(":usvm-jvm-rendering"))
     // https://mvnrepository.com/artifact/org.burningwave/core
     // Use it to export all modules to all
     testImplementation("org.burningwave:core:12.62.7")

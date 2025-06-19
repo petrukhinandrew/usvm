@@ -34,6 +34,7 @@ usvm-jvm-spring-runner/test-dependencies/*
 usvm-jvm-spring-runner/bench-jars/klaw-2.9.0.jar
 usvm-jvm-spring-runner/bench-jars/bench-libs/
 logs/*
+usvm-jvm-spring-runner/weighters.log
 
 *.ansi
 .profileconfig.json

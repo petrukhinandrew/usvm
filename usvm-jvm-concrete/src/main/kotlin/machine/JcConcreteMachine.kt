@@ -25,7 +25,7 @@ open class JcConcreteMachine(
     cp: JcClasspath,
     options: UMachineOptions,
     jcMachineOptions: JcMachineOptions = JcMachineOptions(),
-    protected val jcConcreteMachineOptions: JcConcreteMachineOptions = JcConcreteMachineOptions(),
+    protected val jcConcreteMachineOptions: JcConcreteMachineOptions = JcBuildDirsConcreteMachineOptionsImpl(),
     interpreterObserver: JcInterpreterObserver? = null,
 ) : JcMachine(cp, options, jcMachineOptions, interpreterObserver) {
 
@@ -104,8 +104,10 @@ open class JcConcreteMachine(
             concretePs = ps
             wrappingPathSelector(ps)
         }
-        check(concretePs != null)
-        concretePs!!.setAddStateAction { state ->
+        check(concretePs != null) {
+            "concrete memory path selector not set"
+        }
+        concretePs.setAddStateAction { state ->
             resultPs.add(listOf(state))
         }
         return resultPs

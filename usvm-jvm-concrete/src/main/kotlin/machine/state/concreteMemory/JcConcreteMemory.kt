@@ -56,6 +56,7 @@ import machine.state.concreteMemory.concreteMemoryRegions.JcConcreteRefMapRegion
 import machine.state.concreteMemory.concreteMemoryRegions.JcConcreteRefSetRegion
 import machine.state.concreteMemory.concreteMemoryRegions.JcConcreteRegion
 import machine.state.concreteMemory.concreteMemoryRegions.JcConcreteStaticFieldsRegion
+import org.usvm.StepScope
 import org.usvm.UBoolExpr
 import org.usvm.api.util.JcTestStateResolver
 import org.usvm.concrete.api.internal.ClassLoaderGetHelper
@@ -74,6 +75,10 @@ import org.usvm.jvm.util.name
 import org.usvm.jvm.util.toJavaConstructor
 import org.usvm.jvm.util.toJavaMethod
 import org.usvm.jvm.util.typedField
+import org.usvm.machine.JcConcreteMethodCallInst
+import org.usvm.machine.JcInterpreterObserver
+import org.usvm.machine.JcMethodCallBaseInst
+import org.usvm.machine.interpreter.JcStepScope
 import org.usvm.model.UModelBase
 import org.usvm.util.onNone
 import org.usvm.util.onSome
@@ -592,10 +597,11 @@ open class JcConcreteMemory(
     }
 
     private fun tryConcreteInvokeInternal(
-        stmt: JcMethodCall,
-        state: JcConcreteState,
+        stmt: JcConcreteMethodCallInst,
+        scope: JcStepScope,
         exprResolver: JcExprResolver,
-        jcConcreteMachineOptions: JcConcreteMachineOptions
+        jcConcreteMachineOptions: JcConcreteMachineOptions,
+        interpreterObserver: JcInterpreterObserver?
     ): TryConcreteInvokeResult {
         val method = stmt.method
         val arguments = stmt.arguments
@@ -604,7 +610,10 @@ open class JcConcreteMemory(
 
         val signature = method.humanReadableSignature
 
+        val state = scope.calcOnState { this }
+
         if (method.isClassInitializer) {
+            interpreterObserver?.onMethodCallWithResolvedArguments(exprResolver.simpleValueResolver, stmt, scope)
             val success = ensureClinit(method.enclosingClass)
 
             if (shouldAnalyzeClinit(method) || !success) {
@@ -618,13 +627,13 @@ open class JcConcreteMemory(
 
         if (concretization || shouldConcretizeMethod(method)) {
             // TODO: ignore shouldNotInvoke?
-            concretize(state, exprResolver, stmt, method)
+            concretize(state as JcConcreteState, exprResolver, stmt, method)
             return TryConcreteInvokeSuccess()
         }
 
         val isExceptionCtor = method.isExceptionCtor
         // TODO: change on checking coverage zone #CM
-        val isProjectLocation = jcConcreteMachineOptions.isProjectLocation(method)
+        val isProjectLocation = jcConcreteMachineOptions.isUserClass(method.enclosingClass)
         if (isProjectLocation && !isExceptionCtor)
             return TryConcreteInvokeFail(false)
 
@@ -667,18 +676,20 @@ open class JcConcreteMemory(
             println(ansiGreen + "Invoking $signature" + ansiReset)
         }
 
+        interpreterObserver?.onMethodCallWithResolvedArguments(exprResolver.simpleValueResolver, stmt, scope)
         invoke(state, exprResolver, stmt, method, thisObj, objParameters)
 
         return TryConcreteInvokeSuccess()
     }
 
     fun tryConcreteInvoke(
-        methodCall: JcMethodCall,
-        state: JcState,
+        methodCall: JcConcreteMethodCallInst,
+        scope: JcStepScope,
         exprResolver: JcExprResolver,
-        jcConcreteMachineOptions: JcConcreteMachineOptions
+        jcConcreteMachineOptions: JcConcreteMachineOptions,
+        interpreterObserver: JcInterpreterObserver?
     ): Boolean {
-        val success = tryConcreteInvokeInternal(methodCall, state as JcConcreteState, exprResolver, jcConcreteMachineOptions)
+        val success = tryConcreteInvokeInternal(methodCall, scope, exprResolver, jcConcreteMachineOptions, interpreterObserver)
         // If constructor was not invoked and arguments were symbolic, deleting default 'this' from concrete memory:
         // + No need to encode objects in inconsistent state (created via allocConcrete -- objects with default fields)
         // - During symbolic execution, 'this' may stay concrete

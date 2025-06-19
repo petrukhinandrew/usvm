@@ -5,7 +5,6 @@ import org.jacodb.api.jvm.JcType
 import org.jacodb.api.jvm.JcByteCodeLocation
 import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.cfg.JcInst
-import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.USort

@@ -1,8 +1,16 @@
 import org.gradle.kotlin.dsl.support.unzipTo
 import kotlin.io.path.div
 
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import com.jetbrains.rd.generator.gradle.RdGenExtension
+import com.jetbrains.rd.generator.gradle.RdGenTask
+import org.gradle.kotlin.dsl.register
+
 plugins {
     id("usvm.kotlin-conventions")
+    id(Plugins.Shadow)
+    id(Plugins.RdGen)
+    kotlin("plugin.serialization") version "2.1.21"
 }
 
 repositories {
@@ -11,7 +19,7 @@ repositories {
 
 dependencies {
     implementation(project(":usvm-jvm"))
-    implementation(project(":usvm-jvm-instrumentation"))
+    api(project(":usvm-jvm-instrumentation"))
     implementation(project(":usvm-jvm-concrete"))
     implementation(project(":usvm-jvm-concrete:agent"))
     implementation(project(":usvm-jvm-spring"))
@@ -25,12 +33,46 @@ dependencies {
     implementation(project(":usvm-jvm:usvm-jvm-util"))
     implementation(project(":usvm-jvm:usvm-jvm-api"))
 
+    implementation(Libs.rd_framework)
+    implementation(Libs.rd_core)
+    compileOnly(Libs.rd_gen)
+
     implementation(Libs.jacodb_api_jvm)
     implementation(Libs.jacodb_core)
     implementation(Libs.jacodb_approximations)
-
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation("commons-cli:commons-cli:1.5.0")
     implementation(Libs.logback)
+    implementation(Libs.kotlinx_coroutines_core)
 }
+
+val sourcesBaseDir = projectDir.resolve("src/main/kotlin")
+
+val generatedPackage = "org.usvm.jvm.spring.models"
+val generatedModelsPackage = "org.usvm.jmv.spring.models"
+val generatedModelsSourceDir = sourcesBaseDir.resolve(generatedPackage.replace('.', '/'))
+
+val generateModels = tasks.register<RdGenTask>("generateAnalysisProtocolModels") {
+    val rdParams = extensions.getByName("params") as RdGenExtension
+    val sourcesDir = projectDir.resolve("src/main/kotlin").resolve("org/usvm/jvm/spring/models")
+
+    group = "rdgen"
+    rdParams.verbose = true
+    rdParams.sources(sourcesDir)
+    rdParams.hashFolder = layout.buildDirectory.file("rdgen/hashes").get().asFile.absolutePath
+    // where to search roots
+    rdParams.packages = "org.usvm.jvm.spring.models"
+
+    rdParams.generator {
+        language = "kotlin"
+        transform = "symmetric"
+        root = "org.usvm.jvm.spring.models.definitions.AnalysisProcessRoot"
+
+        directory = generatedModelsSourceDir.absolutePath
+        namespace = generatedModelsPackage
+    }
+}
+
 
 val usvmApiJarConfiguration by configurations.creating
 dependencies {
@@ -59,13 +101,13 @@ val springApproximations by configurations.creating
 val springApproximationsRepo = "org.usvm.approximations.spring"
 val springApproximationsVersion = "0.0.0"
 
-dependencies {
-    springApproximations(springApproximationsRepo, "spring-approximations", springApproximationsVersion)
-}
-
 val agentJarConfiguration by configurations.creating
 dependencies {
     agentJarConfiguration(project(":usvm-jvm-concrete:agent"))
+}
+
+dependencies {
+    springApproximations(springApproximationsRepo, "spring-approximations", springApproximationsVersion)
 }
 
 fun createOrClear(file: File) {
@@ -74,6 +116,35 @@ fun createOrClear(file: File) {
     } else {
         file.mkdirs()
     }
+}
+
+java {
+    withSourcesJar()
+}
+
+val springRunnerJar = tasks.register<ShadowJar>("springJar") {
+    group = "jar"
+    version = "1.2.10"
+    dependsOn.addAll(listOf("compileJava", "compileKotlin", "processResources"))
+    archiveBaseName.set("usvm-jvm-spring-runner")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+            mapOf(
+                "Main-Class" to "bench.WebBenchKt",
+                "Premain-Class" to "org.usvm.jvm.concrete.agent.Agent",
+                "Can-Retransform-Classes" to "true",
+                "Can-Redefine-Classes" to "true",
+//                "Enable-Native-Access" to "ALL-UNNAMED",
+//                "Add-Opens" to addOpensPool.joinToString(" "),
+//                "Add-Exports" to addExportsPool.joinToString(" ")
+            )
+        )
+    }
+
+    configurations = listOf(project.configurations.runtimeClasspath.get())
+    mergeServiceFiles()
+    with(tasks.jar.get() as CopySpec)
 }
 
 fun configureSpringAnalysis(task: JavaExec) = with(task) {
@@ -408,3 +479,11 @@ data class Benchmark(
     val errorsPath: File,
     val name: String,
 )
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+}
