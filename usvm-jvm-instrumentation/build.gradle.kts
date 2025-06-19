@@ -43,8 +43,8 @@ dependencies {
     implementation(Libs.jacodb_api_jvm)
     implementation(Libs.jacodb_core)
     implementation(Libs.rd_framework)
-    implementation(Libs.ini4j)
     implementation(Libs.rd_core)
+    implementation(Libs.ini4j)
     implementation("commons-cli:commons-cli:1.5.0")
 
     rdgenModelsCompileClasspath(Libs.rd_gen)

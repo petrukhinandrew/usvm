@@ -15,7 +15,7 @@ class JcSpringTestObserver : UMachineObserver<JcSpringState> {
         try {
             tests.add(state.generateTest())
         } catch (e: Throwable) {
-            println("generation failed with $e")
+            println("generation failed with $e on state terminated")
         }
     }
 

@@ -51,11 +51,17 @@ class JcSpringMachine(
     }
 
     override fun methodsToTrackCoverage(methods: List<JcMethod>): Set<JcMethod> {
-        return ctx.classesOfLocations(jcConcreteMachineOptions.projectLocations)
-            .filter { it.isSpringController || it.isSpringFilter || it.isSpringHandlerInterceptor }
-            .flatMap { it.declaredMethods }
-            .filterNot { it is JcUnknownMethod || it.isConstructor }
-            .toSet()
+        val res = mutableSetOf<JcMethod>()
+        val classes = ctx.classesOfLocations(jcConcreteMachineOptions.projectLocations)
+        for (clazz in classes) {
+            if (!clazz.isSpringController && !clazz.isSpringFilter && !clazz.isSpringHandlerInterceptor)
+                continue
+            val methods = clazz.declaredMethods
+            methods.filterTo(res) {
+                it !is JcUnknownMethod && !it.isConstructor
+            }
+        }
+        return res
     }
 
     @Suppress("UNCHECKED_CAST")

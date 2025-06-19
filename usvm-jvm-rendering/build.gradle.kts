@@ -10,6 +10,10 @@ dependencies {
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.3")
 }
 
+java {
+    withSourcesJar()
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {

@@ -354,7 +354,7 @@ sealed class Relation(
         private fun join(annotation: JcAnnotation) = annotation.values["name"].let { it as String? }?.let { Join(it) }
         private fun mappedBy(annotation: JcAnnotation) = annotation.values["mappedBy"] as String?
         private fun cascadeType(annotation: JcAnnotation, common: List<CascadeType> = listOf()) =
-            (annotation.values["cascade"] as? List<*>)?.map { CascadeType.valueOf((it as JcField).name) } ?: common
+            ((annotation.values["cascade"] as? List<*>)?.map { CascadeType.valueOf((it as JcField).name) } ?: common)
 
         fun fromField(
             classTable: TableInfo.TableWithIdInfo,

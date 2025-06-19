@@ -412,7 +412,6 @@ private class JcConcreteEffectSequence private constructor(
             return
 
         seq.lastOrNull()?.createAfterIfNeeded()
-
         val commonPartEnd = findCommonPartIndex(other) + 1
         val snapshots = mutableListOf<JcConcreteSnapshot>()
         for (i in seq.lastIndex downTo commonPartEnd) {
@@ -421,7 +420,6 @@ private class JcConcreteEffectSequence private constructor(
                 snapshots.add(effect.before)
             }
         }
-
         val otherSeq = other.seq
         for (i in commonPartEnd until otherSeq.size) {
             val effect = otherSeq[i]
@@ -429,13 +427,11 @@ private class JcConcreteEffectSequence private constructor(
                 snapshots.add(effect.after!!)
             }
         }
-
         if (snapshots.isNotEmpty()) {
             val snapshotSeq = JcConcreteSnapshotSequence(snapshots)
             snapshotSeq.resetObjects()
             snapshotSeq.resetStatics()
         }
-
         seq = other.seq
     }
 

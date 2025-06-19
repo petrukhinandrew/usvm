@@ -285,5 +285,6 @@ open class JcMachine(
 
     override fun close() {
         components.close()
+        ctx.close()
     }
 }

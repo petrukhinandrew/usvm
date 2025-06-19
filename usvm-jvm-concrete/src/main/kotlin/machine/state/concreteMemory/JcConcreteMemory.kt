@@ -520,7 +520,7 @@ open class JcConcreteMemory(
         } else {
             // Exception thrown
             val jcType = ctx.cp.jcTypeOf(exception)!!
-            println("Exception ${exception.javaClass} with message ${exception.message}")
+            println("Exception ${exception.javaClass} with message ${exception.message} and ${exception.stackTraceToString()}")
             val exceptionObj = allocateObject(exception, jcType)
             state.throwExceptionWithoutStackFrameDrop(exceptionObj, jcType)
         }

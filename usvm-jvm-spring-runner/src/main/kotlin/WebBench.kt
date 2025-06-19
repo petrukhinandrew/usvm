@@ -7,9 +7,24 @@ import features.JcClinitFeature
 import features.JcEncodingFeature
 import features.JcGeneratedTypesFeature
 import features.JcInitFeature
+import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.Path
+import kotlin.io.path.PathWalkOption
+import kotlin.io.path.div
+import kotlin.io.path.extension
+import kotlin.io.path.walk
+import kotlin.system.exitProcess
+import kotlin.system.measureNanoTime
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import machine.JcConcreteMachineOptions
 import machine.JcSpringAnalysisMode
+import machine.JcSpringConfigProvider
 import machine.JcSpringMachine
 import machine.JcSpringMachineOptions
 import machine.JcSpringTestObserver
@@ -20,12 +35,14 @@ import machine.interpreter.transformers.springjpa.JcRepositoryTransformer
 import org.jacodb.api.jvm.JcByteCodeLocation
 import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcClasspath
+import org.jacodb.api.jvm.JcClasspathFeature
 import org.jacodb.api.jvm.JcDatabase
-import org.jacodb.api.jvm.cfg.JcRawAssignInst
+import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.cfg.JcRawClassConstant
-import org.jacodb.api.jvm.cfg.JcRawInst
 import org.jacodb.api.jvm.cfg.JcRawReturnInst
 import org.jacodb.api.jvm.ext.findClass
+import org.jacodb.api.jvm.ext.hasAnnotation
+import org.jacodb.api.jvm.ext.humanReadableSignature
 import org.jacodb.api.jvm.ext.jvmName
 import org.jacodb.api.jvm.ext.packageName
 import org.jacodb.api.jvm.ext.toType
@@ -66,69 +83,73 @@ import org.usvm.test.api.spring.SpringBootTest
 import org.usvm.util.classpathWithApproximations
 import testGeneration.SpringTestInfo
 import util.database.JcTableInfoCollector
-import java.io.File
 import java.io.PrintStream
-import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.Path
-import kotlin.io.path.PathWalkOption
-import kotlin.io.path.createFile
-import kotlin.io.path.div
-import kotlin.io.path.exists
-import kotlin.io.path.extension
-import kotlin.io.path.walk
-import kotlin.system.exitProcess
-import kotlin.system.measureNanoTime
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.nanoseconds
 
 private fun loadWebPetClinicBench(): BenchCp {
-    val petClinicDir = Path("/Users/michael/Documents/Work/spring-petclinic/build/libs/BOOT-INF")
+    val petClinicDir =
+        Path("/Users/petrukhinandrew/IdeaProjects/spring-petclinic/build/hueta/spring-petclinic-3.2.0/BOOT-INF")
     return loadWebAppBenchCp(petClinicDir / "classes", petClinicDir / "lib")
 }
 
-private fun loadWebGoatBench(): BenchCp {
-    val webGoatDir = Path("/Users/michael/Documents/Work/WebGoat/target/build/BOOT-INF")
-    return loadWebAppBenchCp(webGoatDir / "classes", webGoatDir / "lib")
-}
-
-private fun loadKafdropBench(): BenchCp {
-    val kafdropDir = Path("/Users/michael/Documents/Work/kafdrop/target/build/BOOT-INF")
-    return loadWebAppBenchCp(kafdropDir / "classes", kafdropDir / "lib")
-}
-
-private fun loadKlawBench(): BenchCp {
-    val klawDir = Path("/Users/michael/Documents/Work/klaw/core/target/build/BOOT-INF")
-    return loadWebAppBenchCp(klawDir / "classes", klawDir / "lib")
-}
-
-private fun loadSynthBench(): BenchCp {
-    val benchDir = Path("C:/Users/arthur/Documents/usvm-spring-benchmarks/build/libs/BOOT-INF")
-    return loadWebAppBenchCp(benchDir / "classes", benchDir / "lib")
-}
-
-private fun loadJHipsterBench(): BenchCp {
-    val benchDir = Path("/Users/michael/Documents/Work/jhipster-registry/target/build/BOOT-INF")
-    return loadWebAppBenchCp(benchDir / "classes", benchDir / "lib")
-}
-
-private fun loadBenchFromEnv(): BenchCp {
-    val benchDir = Path(System.getenv("usvm.benchmark"))
-    return loadWebAppBenchCp(benchDir / "classes", benchDir / "lib")
-}
-
-fun main() {
+fun main(args: Array<String>) {
     val benchCp = logTime("Init jacodb") {
-        loadBenchFromEnv()
+        loadWebPetClinicBench()
     }
 
     logTime("Analysis ALL") {
-        benchCp.use { analyzeBench(it) }
+        benchCp.use { analyzeBench(it, 2.minutes) }
+    }
+
+    exitProcess(0)
+}
+
+object ControllerMethodAnnotations {
+    private const val CONTROLLER_ANNOTATIONS_PACKAGE = "org.springframework.web.bind.annotation"
+
+    val springControllerAnnotations = listOf(
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.GetMapping",
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.PostMapping",
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.PutMapping",
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.DeleteMapping",
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.PatchMapping",
+        "$CONTROLLER_ANNOTATIONS_PACKAGE.RequestMapping",
+    )
+}
+
+private const val ctlAnnotation = "org.springframework.stereotype.Controller"
+
+private fun getCtlPathPrefix(ctl: JcClassOrInterface): String? =
+    ctl.annotations.firstOrNull { it.matches(ctlAnnotation) }?.values?.getOrElse("value") { "" } as? String
+
+
+@Serializable
+data class BenchTarget(val ctlName: String, val path: String, val handle: String) {
+    companion object {
+        fun fromHandle(handle: JcMethod): BenchTarget? {
+            val ctl = handle.enclosingClass
+            val pathPrefix = getCtlPathPrefix(ctl) ?: return null
+
+            val path = handle.annotations.firstOrNull { annotation ->
+                annotation.name in ControllerMethodAnnotations.springControllerAnnotations
+            }?.values?.getOrElse("value") { listOf<String>() } as? List<*> ?: return null
+
+            return BenchTarget(ctl.name, pathPrefix + path, handle.humanReadableSignature)
+        }
     }
 }
 
-private class BenchCp(
+private fun collectBenchTargets(benchCp: BenchCp): List<BenchTarget> {
+    val userControllers = benchCp.cp.nonAbstractClasses(benchCp.classLocations)
+        .filter { it.hasAnnotation(ctlAnnotation) }
+    val collected = userControllers.flatMap { ctl ->
+        ctl.declaredMethods.mapNotNull { handle ->
+            BenchTarget.fromHandle(handle)
+        }
+    }.toList()
+    return collected
+}
+
+class BenchCp(
     val cp: JcClasspath,
     val db: JcDatabase,
     val classLocations: List<JcByteCodeLocation>,
@@ -178,23 +199,23 @@ private fun loadBench(
 
     val cp = db.classpathWithApproximations(cpFiles, features)
 
-    val classLocations = cp.locations.filter { it.jarOrFolder in classes }
-    val depsLocations = cp.locations.filter { it.jarOrFolder in dependencies }
+    val classLocations = cp.locations.filter { it.path in classes.map { it.path } }
+    val depsLocations = cp.locations.filter { it.path in dependencies.map { file -> file.path } }
     BenchCp(cp, db, classLocations, depsLocations, cpFiles, classes, dependencies, testKind)
 }
 
-private fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
-    val springTestDeps =
-        System.getenv("usvm.jvm.springTestDeps.paths")
-            .split(";")
-            .map { File(it) }
+fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
+//    val springTestDeps =
+//        System.getenv("usvm.jvm.springTestDeps.paths")
+//            .split(";")
+//            .map { File(it) }
 
     val usvmConcreteApiJarPath = File(System.getenv("usvm.jvm.concrete.api.jar.path"))
     check(usvmConcreteApiJarPath.exists()) { "Concrete API jar does not exist" }
 
     var cpFiles = classes + dependencies + usvmConcreteApiJarPath
     // TODO: add springTestDeps only if user's dependencies do not contain them
-    cpFiles += springTestDeps
+//    cpFiles += springTestDeps
 
     val db = jacodb {
         useProcessJavaRuntime()
@@ -215,11 +236,11 @@ private fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp 
     loadBench(db, cpFiles, classes, dependencies, true)
 }
 
-private fun loadWebAppBenchCp(classes: Path, dependencies: Path): BenchCp =
+fun loadWebAppBenchCp(classes: Path, dependencies: Path): BenchCp =
     loadWebAppBenchCp(listOf(classes), dependencies)
 
 @OptIn(ExperimentalPathApi::class)
-private fun loadWebAppBenchCp(classes: List<Path>, dependencies: Path): BenchCp =
+fun loadWebAppBenchCp(classes: List<Path>, dependencies: Path): BenchCp =
     loadBenchCp(
         classes = classes.map { it.toFile() },
         dependencies = dependencies
@@ -231,8 +252,8 @@ private fun loadWebAppBenchCp(classes: List<Path>, dependencies: Path): BenchCp 
 
 private val JcClassOrInterface.jvmDescriptor: String get() = name.jvmName()
 
-private fun allByAnnotation(allClasses: Sequence<JcClassOrInterface>, annotationName: String) =
-    allClasses.filter { it.annotations.any { annotation -> annotation.name == annotationName } }
+fun allByAnnotation(allClasses: Sequence<JcClassOrInterface>, annotationName: String) =
+    allClasses.filter { it.hasAnnotation(annotationName) }
 
 private fun addSecurityConfigs(testClassNode: ClassNode, nonAbstractClasses: Sequence<JcClassOrInterface>) {
     val importAnnotationName = "org.springframework.context.annotation.Import".jvmName()
@@ -251,8 +272,13 @@ private fun replaceTypeInClassNode(
     oldClassName: String,
     newClassName: String
 ) {
-    check(!oldClassName.contains('/'))
-    check(!newClassName.contains('/'))
+    check(!oldClassName.contains('/')) {
+        "bad old class name $oldClassName"
+    }
+
+    check(!newClassName.contains('/')) {
+        "bad new class name $newClassName"
+    }
 
     val oldClassSlashName = oldClassName.replace(".", "/")
     val oldClassJvmName = "L$oldClassSlashName;"
@@ -329,7 +355,7 @@ private fun replaceTypeInClassNode(
 }
 
 @Suppress("SameParameterValue")
-private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMode): BenchCp {
+private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMode, springBootApp: String?): BenchCp {
     val cp = benchmark.cp
 
     val springDirFile = File(System.getenv("springDir"))
@@ -337,7 +363,7 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
     val classLocations = benchmark.classLocations
     val nonAbstractClasses = cp.nonAbstractClasses(classLocations)
 
-    val repositoryType = cp.findClass("org.springframework.data.repository.Repository")
+    val repositoryType = cp.findClassOrNull("org.springframework.data.repository.Repository") ?: error("cannot find Repository class")
     val repositories = runBlocking { cp.hierarchyExt() }
         .findSubClasses(repositoryType, entireHierarchy = true, includeOwn = false)
         .filter { classLocations.contains(it.declaration.location.jcLocation) }
@@ -349,17 +375,25 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
         if (hasJpa) "generated.org.springframework.boot.testClasses.SpringBootJpaTestClass"
         else "generated.org.springframework.boot.testClasses.SpringBootTestClass"
 
-    val applicationClass = allByAnnotation(
-        nonAbstractClasses,
-        "org.springframework.boot.autoconfigure.SpringBootApplication"
-    ).singleOrNull() ?: error("No entry classes found (with SpringBootApplication annotation)")
+    val applicationClass =
+        if (springBootApp == null) {
+            val applicationClasses = allByAnnotation(
+                nonAbstractClasses,
+                "org.springframework.boot.autoconfigure.SpringBootApplication"
+            ).toList()
+
+            applicationClasses.singleOrNull() ?: error("No entry classes found (with SpringBootApplication annotation)")
+        } else {
+            cp.findClassOrNull(springBootApp) ?: error("Not SpringBootApplication annotated class found for name $springBootApp")
+        }
+
     val entryPackagePath = applicationClass.packageName.replace('.', '/')
     val testClassName = "NewSpringBootTestClass"
     val newTestClassSlashName = "$entryPackagePath/$testClassName"
     val newTestClassName = newTestClassSlashName.replace('/', '.')
 
     var testKind: JcSpringTestKind? = null
-    val testClassTemplate = cp.findClass(testClassTemplateName)
+    val testClassTemplate = cp.findClassOrNull(testClassTemplateName) ?: error("testClassTemplate not found")
     testClassTemplate.withAsmNode { classNode ->
         classNode.name = newTestClassSlashName
 
@@ -387,9 +421,9 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
 
     val startSpringTemplateName = "generated.org.springframework.boot.StartSpring"
     val newStartSpringName = "NewStartSpring"
-    val startSpringClass = cp.findClassOrNull(startSpringTemplateName)!!
+    val startSpringClass = cp.findClassOrNull(startSpringTemplateName) ?: error("cannot find StartSpring class")
     startSpringClass.withAsmNode { startSpringAsmNode ->
-        val chooseTestClassMethod = startSpringClass.declaredMethods.find { it.name == "chooseTestClass" }!!
+        val chooseTestClassMethod = startSpringClass.declaredMethods.find { it.name == "chooseTestClass" } ?: error("chooseTestClass method does not exist")
         chooseTestClassMethod.withAsmNode { chooseTestClassMethodAsmNode ->
             val classConstant = JcRawClassConstant(
                 TypeNameImpl.fromTypeName(newTestClassName),
@@ -425,10 +459,9 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
     )
 }
 
-private fun analyzeBench(benchmark: BenchCp) {
+fun analyzeBench(benchmark: BenchCp, runnerTimeout: Duration, springBootApp: String? = null): List<SpringTestInfo> {
     val springAnalysisMode = JcSpringAnalysisMode.SpringBootTest
-    val newBench = generateTestClass(benchmark, springAnalysisMode)
-
+    val newBench = generateTestClass(benchmark, springAnalysisMode, springBootApp)
     val jcConcreteMachineOptions = JcConcreteMachineOptions(
         projectLocations = newBench.classLocations,
         dependenciesLocations = newBench.depsLocations,
@@ -443,14 +476,14 @@ private fun analyzeBench(benchmark: BenchCp) {
     val startClass = nonAbstractClasses.find { it.simpleName == "NewStartSpring" }!!.toType()
     val method = startClass.declaredMethods.find { it.name == "startSpring" }!!
     // using file instead of console
-    val fileStream = PrintStream(System.getenv("usvm.log") ?: "springLog.ansi")
-    System.setOut(fileStream)
+//    val fileStream = PrintStream("springLog.ansi")
+//    System.setOut(fileStream)
     val options = UMachineOptions(
         useSoftConstraints = false,
         pathSelectionStrategies = listOf(PathSelectionStrategy.BFS),
         coverageZone = CoverageZone.METHOD,
         exceptionsPropagation = false,
-        timeout = 4.minutes,
+        timeout = runnerTimeout,
         solverType = SolverType.YICES,
         loopIterationLimit = 2,
         solverTimeout = Duration.INFINITE, // we do not need the timeout for a solver in tests
@@ -478,14 +511,13 @@ private fun analyzeBench(benchmark: BenchCp) {
         logger.error(e) { "Machine failed" }
     }
 
-    reproduceTests(testObserver.generatedTests, jcConcreteMachineOptions, cp)
-
-    analyzeLog()
-
-    exitProcess(0)
+//    reproduceTests(testObserver.generatedTests, jcConcreteMachineOptions, cp)
+//
+//    exitProcess(0)
+    return testObserver.generatedTests
 }
 
-private fun SpringTestInfo.toRenderInfo(): Pair<UTest, JcSpringMvcTestInfo> {
+fun SpringTestInfo.toRenderInfo(): Pair<UTest, JcSpringMvcTestInfo> {
     return this.test to JcSpringMvcTestInfo(this.method, this.isExceptional)
 }
 

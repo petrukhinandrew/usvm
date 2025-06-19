@@ -606,11 +606,8 @@ class JcSpringMethodApproximationResolver (
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun shouldAnalyzePath(path: String, methods: List<String>, controllerTypeName: String): Boolean {
-        val preferredPath = System.getenv("usvm.path") ?: ".*"
-        val preferredMethod = System.getenv("usvm.method") ?: ".*"
-        val methodMatches = methods.any { Regex(preferredMethod).matches(it) }
-        return Regex(preferredPath).matches(path) && methodMatches
+    private fun shouldAnalyzePath(path: String, handlerName: String, controllerTypeName: String): Boolean {
+        return JcSpringConfigProvider.shoudlAnalyze(path, controllerTypeName, handlerName)
     }
 
     private fun shouldSkipController(controllerType: JcClassOrInterface): Boolean {

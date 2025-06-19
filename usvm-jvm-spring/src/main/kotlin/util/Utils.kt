@@ -4,6 +4,7 @@ import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.ext.isSubClassOf
 
+
 internal val JcClassOrInterface.isSpringFilter: Boolean
     get() {
         val filterType = classpath.findClassOrNull("jakarta.servlet.Filter")

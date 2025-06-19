@@ -23,26 +23,44 @@ class JcSpringMvcTestTransformer: JcTestTransformer() {
         return name == "prepareTestInstance" && enclosingClass.name == testContextManagerName
     }
 
+    private val JcMethod.isBeforeTestClassMethod: Boolean get() {
+        return name == "beforeTestClass" && enclosingClass.name == testContextManagerName
+    }
+
+    private val JcMethod.isAfterTestMethod: Boolean get() {
+        return name == "afterTestMethod" && enclosingClass.name == testContextManagerName && parameters.size == 3
+    }
+
+    private val JcMethod.isBeforeTestMethod: Boolean get() {
+        return name == "beforeTestMethod" && enclosingClass.name == testContextManagerName && parameters.size == 2
+    }
+
     override fun transform(call: UTestMethodCall): UTestCall? {
         val method = call.method
 
-        if (method.isPrepareInstanceMethod) {
-            val instance = call.instance
-            check(instance is UTestConstructorCall && instance.method.enclosingClass.name == testContextManagerName) {
-                "isPrepareInstanceMethod instance fail"
+        return when {
+            method.isPrepareInstanceMethod -> {
+                val instance = call.instance
+                check(instance is UTestConstructorCall && instance.method.enclosingClass.name == testContextManagerName) {
+                    "isPrepareInstanceMethod instance fail"
+                }
+
+                val arg = instance.args.singleOrNull() as? UTestClassExpression
+                check(arg != null) {
+                    "isPrepareInstanceMethod arg fail"
+                }
+
+                mvcTestClass = (arg.type as JcClassType).jcClass
+
+                null
             }
 
-            val arg = instance.args.singleOrNull() as? UTestClassExpression
-            check(arg != null) {
-                "isPrepareInstanceMethod arg fail"
+            method.isBeforeTestClassMethod || method.isAfterTestMethod || method.isBeforeTestMethod -> {
+                null
             }
 
-            mvcTestClass = (arg.type as JcClassType).jcClass
-
-            return null
+            else -> super.transform(call)
         }
-
-        return super.transform(call)
     }
 
     override fun transform(call: UTestStaticMethodCall): UTestCall? {

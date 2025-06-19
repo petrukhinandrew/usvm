@@ -28,3 +28,11 @@ dependencies {
 
 tasks.getByName("compileTestKotlin").dependsOn("generateTestGrammarSource")
 tasks.getByName("compileKotlin").dependsOn("generateGrammarSource")
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+}
