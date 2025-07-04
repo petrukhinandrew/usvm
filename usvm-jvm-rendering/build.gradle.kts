@@ -14,6 +14,11 @@ java {
     withSourcesJar()
 }
 
+tasks.withType<ProcessResources> {
+    val reflectionUtils = project.sourceSets.main.get().java.find { file -> file.name == "ReflectionUtils.java" }
+    from(reflectionUtils)
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {

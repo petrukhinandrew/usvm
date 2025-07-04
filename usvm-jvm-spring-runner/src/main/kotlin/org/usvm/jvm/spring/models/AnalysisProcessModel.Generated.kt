@@ -16,10 +16,13 @@ import kotlin.jvm.JvmStatic
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:11]
+ * #### Generated from [AnalysisProcessModel.kt:12]
  */
 class AnalysisProcessModel private constructor(
-    private val _runAnalysis: RdCall<AnalysisRequest, AnalysisResponse>
+    private val _runAnalysis: RdSignal<AnalysisRequest>,
+    private val _newTestGenerated: RdSignal<String>,
+    private val _errorOccured: RdSignal<ErrorDescriptor>,
+    private val _generatedTests: RdList<String>
 ) : RdExtBase() {
     //companion
     
@@ -27,7 +30,7 @@ class AnalysisProcessModel private constructor(
         
         override fun registerSerializersCore(serializers: ISerializers)  {
             serializers.register(AnalysisRequest)
-            serializers.register(AnalysisResponse)
+            serializers.register(ErrorDescriptor)
         }
         
         
@@ -48,28 +51,44 @@ class AnalysisProcessModel private constructor(
         }
         
         
-        const val serializationHash = -2178932984909967470L
+        const val serializationHash = -5914040717084540285L
         
     }
     override val serializersOwner: ISerializersOwner get() = AnalysisProcessModel
     override val serializationHash: Long get() = AnalysisProcessModel.serializationHash
     
     //fields
-    val runAnalysis: RdCall<AnalysisRequest, AnalysisResponse> get() = _runAnalysis
+    val runAnalysis: IAsyncSignal<AnalysisRequest> get() = _runAnalysis
+    val newTestGenerated: IAsyncSignal<String> get() = _newTestGenerated
+    val errorOccured: IAsyncSignal<ErrorDescriptor> get() = _errorOccured
+    val generatedTests: IMutableViewableList<String> get() = _generatedTests
     //methods
     //initializer
     init {
+        _generatedTests.optimizeNested = true
+    }
+    
+    init {
         _runAnalysis.async = true
+        _newTestGenerated.async = true
+        _errorOccured.async = true
+        _generatedTests.async = true
     }
     
     init {
         bindableChildren.add("runAnalysis" to _runAnalysis)
+        bindableChildren.add("newTestGenerated" to _newTestGenerated)
+        bindableChildren.add("errorOccured" to _errorOccured)
+        bindableChildren.add("generatedTests" to _generatedTests)
     }
     
     //secondary constructor
     private constructor(
     ) : this(
-        RdCall<AnalysisRequest, AnalysisResponse>(AnalysisRequest, AnalysisResponse)
+        RdSignal<AnalysisRequest>(AnalysisRequest),
+        RdSignal<String>(FrameworkMarshallers.String),
+        RdSignal<ErrorDescriptor>(ErrorDescriptor),
+        RdList<String>(FrameworkMarshallers.String)
     )
     
     //equals trait
@@ -79,13 +98,19 @@ class AnalysisProcessModel private constructor(
         printer.println("AnalysisProcessModel (")
         printer.indent {
             print("runAnalysis = "); _runAnalysis.print(printer); println()
+            print("newTestGenerated = "); _newTestGenerated.print(printer); println()
+            print("errorOccured = "); _errorOccured.print(printer); println()
+            print("generatedTests = "); _generatedTests.print(printer); println()
         }
         printer.print(")")
     }
     //deepClone
     override fun deepClone(): AnalysisProcessModel   {
         return AnalysisProcessModel(
-            _runAnalysis.deepClonePolymorphic()
+            _runAnalysis.deepClonePolymorphic(),
+            _newTestGenerated.deepClonePolymorphic(),
+            _errorOccured.deepClonePolymorphic(),
+            _generatedTests.deepClonePolymorphic()
         )
     }
     //contexts
@@ -95,7 +120,7 @@ val IProtocol.analysisProcessModel get() = getOrCreateExtension(AnalysisProcessM
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:12]
+ * #### Generated from [AnalysisProcessModel.kt:13]
  */
 data class AnalysisRequest (
     val userClassPath: List<String>,
@@ -194,24 +219,27 @@ data class AnalysisRequest (
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:25]
+ * #### Generated from [AnalysisProcessModel.kt:26]
  */
-data class AnalysisResponse (
-    val testClass: String?
+data class ErrorDescriptor (
+    val message: String,
+    val stackTrace: String
 ) : IPrintable {
     //companion
     
-    companion object : IMarshaller<AnalysisResponse> {
-        override val _type: KClass<AnalysisResponse> = AnalysisResponse::class
+    companion object : IMarshaller<ErrorDescriptor> {
+        override val _type: KClass<ErrorDescriptor> = ErrorDescriptor::class
         
         @Suppress("UNCHECKED_CAST")
-        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): AnalysisResponse  {
-            val testClass = buffer.readNullable { buffer.readString() }
-            return AnalysisResponse(testClass)
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ErrorDescriptor  {
+            val message = buffer.readString()
+            val stackTrace = buffer.readString()
+            return ErrorDescriptor(message, stackTrace)
         }
         
-        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: AnalysisResponse)  {
-            buffer.writeNullable(value.testClass) { buffer.writeString(it) }
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ErrorDescriptor)  {
+            buffer.writeString(value.message)
+            buffer.writeString(value.stackTrace)
         }
         
         
@@ -225,23 +253,26 @@ data class AnalysisResponse (
         if (this === other) return true
         if (other == null || other::class != this::class) return false
         
-        other as AnalysisResponse
+        other as ErrorDescriptor
         
-        if (testClass != other.testClass) return false
+        if (message != other.message) return false
+        if (stackTrace != other.stackTrace) return false
         
         return true
     }
     //hash code trait
     override fun hashCode(): Int  {
         var __r = 0
-        __r = __r*31 + if (testClass != null) testClass.hashCode() else 0
+        __r = __r*31 + message.hashCode()
+        __r = __r*31 + stackTrace.hashCode()
         return __r
     }
     //pretty print
     override fun print(printer: PrettyPrinter)  {
-        printer.println("AnalysisResponse (")
+        printer.println("ErrorDescriptor (")
         printer.indent {
-            print("testClass = "); testClass.print(printer); println()
+            print("message = "); message.print(printer); println()
+            print("stackTrace = "); stackTrace.print(printer); println()
         }
         printer.print(")")
     }

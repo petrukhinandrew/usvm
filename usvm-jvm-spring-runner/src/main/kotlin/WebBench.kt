@@ -2,7 +2,6 @@ package bench
 
 import SpringTestRenderer
 import SpringTestReproducer
-import analyzeLog
 import features.JcClinitFeature
 import features.JcEncodingFeature
 import features.JcGeneratedTypesFeature
@@ -24,7 +23,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import machine.JcConcreteMachineOptions
 import machine.JcSpringAnalysisMode
-import machine.JcSpringConfigProvider
 import machine.JcSpringMachine
 import machine.JcSpringMachineOptions
 import machine.JcSpringTestObserver
@@ -35,12 +33,10 @@ import machine.interpreter.transformers.springjpa.JcRepositoryTransformer
 import org.jacodb.api.jvm.JcByteCodeLocation
 import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcClasspath
-import org.jacodb.api.jvm.JcClasspathFeature
 import org.jacodb.api.jvm.JcDatabase
 import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.cfg.JcRawClassConstant
 import org.jacodb.api.jvm.cfg.JcRawReturnInst
-import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.hasAnnotation
 import org.jacodb.api.jvm.ext.humanReadableSignature
 import org.jacodb.api.jvm.ext.jvmName
@@ -83,7 +79,6 @@ import org.usvm.test.api.spring.SpringBootTest
 import org.usvm.util.classpathWithApproximations
 import testGeneration.SpringTestInfo
 import util.database.JcTableInfoCollector
-import java.io.PrintStream
 
 private fun loadWebPetClinicBench(): BenchCp {
     val petClinicDir =
@@ -97,7 +92,7 @@ fun main(args: Array<String>) {
     }
 
     logTime("Analysis ALL") {
-        benchCp.use { analyzeBench(it, 2.minutes) }
+//        benchCp.use { analyzeBench(it, 2.minutes) }
     }
 
     exitProcess(0)
@@ -355,7 +350,7 @@ private fun replaceTypeInClassNode(
 }
 
 @Suppress("SameParameterValue")
-private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMode, springBootApp: String?): BenchCp {
+fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMode, springBootApp: String?): BenchCp {
     val cp = benchmark.cp
 
     val springDirFile = File(System.getenv("springDir"))
@@ -369,7 +364,7 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
         .filter { classLocations.contains(it.declaration.location.jcLocation) }
         .toList() + allByAnnotation(nonAbstractClasses, "org.springframework.stereotype.Repository")
     val entityManagerType = cp.findClassOrNull("jakarta.persistence.EntityManager")
-    val hasJpa = repositories.isNotEmpty() || entityManagerType != null && entityManagerType !is JcUnknownClass
+    val hasJpa = false // repositories.isNotEmpty() || entityManagerType != null && entityManagerType !is JcUnknownClass
 
     val testClassTemplateName =
         if (hasJpa) "generated.org.springframework.boot.testClasses.SpringBootJpaTestClass"
@@ -459,9 +454,7 @@ private fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAn
     )
 }
 
-fun analyzeBench(benchmark: BenchCp, runnerTimeout: Duration, springBootApp: String? = null): List<SpringTestInfo> {
-    val springAnalysisMode = JcSpringAnalysisMode.SpringBootTest
-    val newBench = generateTestClass(benchmark, springAnalysisMode, springBootApp)
+fun analyzeBench(newBench: BenchCp, springAnalysisMode: JcSpringAnalysisMode, runnerTimeout: Duration, springBootApp: String? = null, testObserver: JcSpringTestObserver = JcSpringTestObserver()): List<SpringTestInfo> {
     val jcConcreteMachineOptions = JcConcreteMachineOptions(
         projectLocations = newBench.classLocations,
         dependenciesLocations = newBench.depsLocations,
@@ -493,8 +486,6 @@ fun analyzeBench(benchmark: BenchCp, runnerTimeout: Duration, springBootApp: Str
         forkOnImplicitExceptions = true,
         arrayMaxSize = 10_000,
     )
-
-    val testObserver = JcSpringTestObserver()
 
     val machine = JcSpringMachine(
         cp,

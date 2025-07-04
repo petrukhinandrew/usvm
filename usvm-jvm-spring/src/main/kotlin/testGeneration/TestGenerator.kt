@@ -108,7 +108,7 @@ private fun JcSpringState.createSpringTestKind(testClass: JcClassOrInterface): J
     }
 }
 
-internal fun JcSpringState.generateTest(): SpringTestInfo {
+fun JcSpringState.generateTest(): SpringTestInfo {
     val model = springMemory.getFixedModel(this)
     val resolver = JcSpringTestExprResolver(ctx, model, memory, entrypoint.toTypedMethod)
 

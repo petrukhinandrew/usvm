@@ -1,8 +1,8 @@
 package org.usvm.jvm.spring.runner
 
 import bench.analyzeBench
+import bench.generateTestClass
 import bench.loadBenchCp
-import bench.toRenderInfo
 import com.jetbrains.rd.framework.IdKind
 import com.jetbrains.rd.framework.Identities
 import com.jetbrains.rd.framework.Protocol
@@ -12,6 +12,9 @@ import com.jetbrains.rd.framework.impl.RdCall
 import com.jetbrains.rd.framework.util.launch
 import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
+import com.jetbrains.rd.util.reactive.IMutableViewableList
+import com.jetbrains.rd.util.reactive.IScheduler
+import com.jetbrains.rd.util.reactive.adviseEternal
 import com.jetbrains.rd.util.threading.SingleThreadScheduler
 import java.io.File
 import kotlin.system.measureNanoTime
@@ -23,9 +26,13 @@ import kotlin.time.toDuration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import machine.JcSpringAnalysisMode
 import machine.JcSpringConfigProvider
+import mu.KLogging
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Options
 import org.usvm.instrumentation.generated.models.syncProtocolModel
@@ -34,23 +41,11 @@ import org.usvm.instrumentation.rd.MAIN_PROCESS_NAME
 import org.usvm.instrumentation.rd.adviseForConditionAsync
 import org.usvm.instrumentation.rd.pumpAsync
 import org.usvm.jmv.spring.models.AnalysisProcessModel
-import org.usvm.jmv.spring.models.AnalysisResponse
+import org.usvm.jmv.spring.models.AnalysisRequest
 import org.usvm.jmv.spring.models.analysisProcessModel
-import org.usvm.jvm.rendering.JcTestsRenderer
-import org.usvm.logger
+import org.usvm.jvm.spring.models.JcSpringTestRdObserver
 
-open class ExecutableProcess private constructor() {
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val proc = newProcessInstance()
-
-        }
-        fun newProcessInstance(): ExecutableProcess {
-            return ExecutableProcess()
-        }
-    }
-}
+val logger = object : KLogging() {}.logger
 
 class AnalysisProcess private constructor() {
     companion object {
@@ -73,15 +68,17 @@ class AnalysisProcess private constructor() {
             ?: 120.toDuration(DurationUnit.SECONDS)
         val port = cmd.getOptionValue("p").toIntOrNull() ?: error("Specify rd port number")
         val def = LifetimeDefinition()
+        println("proc: created def")
         def.terminateOnException {
-            def.launch {
-                checkAliveLoop(def, 1.seconds)
-            }
-
+//            def.launch {
+//                checkAliveLoop(def, 1.seconds)
+//            }
+            println("proc: after check alive loop launch")
             initiate(def, port, timeout)
-
+            println("proc: after initiate")
             def.awaitTermination()
         }
+        println("proc: leaving")
     }
 
     private enum class State {
@@ -123,90 +120,85 @@ class AnalysisProcess private constructor() {
             protocol.syncProtocolModel
             protocol.analysisProcessModel
         }.await()
-
-        model.setup(timeout)
-        println(timeout)
-
+        println("proc: model pumped kak nado")
+        model.setup(timeout, lifetime, scheduler)
+        println("proc: model setup done")
         protocol.syncProtocolModel.synchronizationSignal.let { sync ->
             val answerFromMainProcess = sync.adviseForConditionAsync(lifetime) {
                 if (it == MAIN_PROCESS_NAME) {
-                    measureExecutionForTermination {
+//                    measureExecutionForTermination {
                         sync.fire(CHILD_PROCESS_NAME)
-                    }
+//                    }
+                    println("proc: true")
                     true
                 } else {
+                    println("proc: false")
                     false
                 }
             }
             answerFromMainProcess.await()
         }
+        println("proc: syncSig let")
     }
 
-    private fun AnalysisProcessModel.setup(runnerTimeout: Duration) {
-        runAnalysis.measureExecutionForTermination { request ->
-
-            JcSpringConfigProvider.reset()
-            request.analysisController?.let { JcSpringConfigProvider.analyzeController(it) }
-            request.analysisHandle?.let { JcSpringConfigProvider.analyzeHandler(it) }
-            request.analysisPath.forEach { JcSpringConfigProvider.addAnalyzePath(it) }
-            JcSpringConfigProvider.analyzeBootApp(request.analysisBootApp)
-
-            val benchCp = logTime("Init jacodb") {
-                loadBenchCp(request.userClassPath.map { File(it) }, request.libsClassPath.map { File(it) })
-            }
-
-            println("bench loaded")
-
-            logTime("Analysis ALL") {
-                val tests = runCatching {
-                    benchCp.use {
-                        analyzeBench(it, runnerTimeout, JcSpringConfigProvider.bootApp)
-                    }
-                }.getOrElse { exception -> println("${exception.message}\n${exception.cause}\n${exception.stackTraceToString()}"); return@getOrElse listOf() }
-                println("DBG: tests generated ${tests.size}")
-                AnalysisResponse(JcTestsRenderer().renderTests(benchCp.cp, tests.map { it.toRenderInfo() }, true).values.firstOrNull())
-            }
-
-//            AnalysisResponse("""
-//                package ${request.testClassPackage};
-//
-//                import jakarta.servlet.ServletException;
-//                import org.junit.jupiter.api.Assertions;
-//                import org.junit.jupiter.api.Test;
-//                import org.junit.jupiter.api.extension.ExtendWith;
-//                import org.springframework.beans.factory.annotation.Autowired;
-//                import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-//                import org.springframework.boot.test.context.SpringBootTest;
-//                import org.springframework.samples.petclinic.PetClinicApplication;
-//                import org.springframework.test.context.TestContextManager;
-//                import org.springframework.test.context.TestPropertySource;
-//                import org.springframework.test.context.aot.DisabledInAotMode;
-//                import org.springframework.test.context.junit.jupiter.SpringExtension;
-//                import org.springframework.test.web.servlet.MockMvc;
-//                import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-//
-//                import java.lang.reflect.Method;
-//
-//                @ExtendWith(value = {SpringExtension.class})
-//                @SpringBootTest(classes = {PetClinicApplication.class})
-//                @AutoConfigureMockMvc
-//                @TestPropertySource(properties = {"spring.sql.init.mode=never", "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.defer-datasource-initialization=true"})
-//                @DisabledInAotMode
-//                class ${request.testClassName} {
-//
-//                	@Test
-//                	void initCreationForm() throws NoSuchMethodException, Exception, SecurityException {
-//
-//                		Assertions.assertThrows(ServletException.class, () -> {
-//                			this.mockMvc.perform(MockMvcRequestBuilders.get("/owners/new"));
-//                		});
-//                	}
-//
-//                	@Autowired
-//                	private MockMvc mockMvc;
-//                }
-//            """.trimIndent())
+    private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime, scheduler: IScheduler) {
+//        val observer = JcSpringTestRdObserver(
+//            onNewTest = { render ->
+//                newTestGenerated.fire(render)
+//                generatedTests.add(render)
+//            },
+//            onError = { descr -> errorOccured.fire(descr) }
+//        )
+//        println("proc: obs created")
+        runAnalysis.advise(lifetime) { request ->
+//            runConcreteAnalysis(observer, request, runnerTimeout)
+            println("proc: signal received")
+            runAnalysisMock(request, generatedTests)
         }
+        println("proc: run adviced")
+    }
+
+    private fun runConcreteAnalysis(observer: JcSpringTestRdObserver, request: AnalysisRequest, runnerTimeout: Duration) {
+        bindRequest(request)
+        val springAnalysisMode = JcSpringAnalysisMode.SpringBootTest
+
+
+        val benchCp = logTime("Init jacodb") {
+            loadBenchCp(request.userClassPath.map { File(it) }, request.libsClassPath.map { File(it) })
+        }
+        val newBench = generateTestClass(benchCp, springAnalysisMode, request.analysisBootApp)
+
+        newBench.use { bench ->
+            println("running analysis")
+            analyzeBench(
+                bench,
+                springAnalysisMode,
+                runnerTimeout,
+                JcSpringConfigProvider.bootApp,
+                observer
+            )
+        }
+    }
+
+    private fun runAnalysisMock(request: AnalysisRequest, tests: IMutableViewableList<String>) {
+        try {
+            repeat(10) {
+                val msg = "$it'th test for requested ${request.testClassName}"
+                println(msg)
+                tests.add(msg)
+            }
+        }
+        catch (e: Throwable) {
+            println("ti pidor ${e.message ?: "irl"}\n ${e.stackTraceToString()}")
+        }
+    }
+
+    private fun bindRequest(request: AnalysisRequest) {
+        JcSpringConfigProvider.reset()
+        request.analysisController?.let { JcSpringConfigProvider.analyzeController(it) }
+        request.analysisHandle?.let { JcSpringConfigProvider.analyzeHandler(it) }
+        request.analysisPath.forEach { JcSpringConfigProvider.addAnalyzePath(it) }
+        JcSpringConfigProvider.analyzeBootApp(request.analysisBootApp)
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -215,6 +207,8 @@ class AnalysisProcess private constructor() {
             return block(this)
         } catch (e: Throwable) {
             terminate()
+            println((e.message ?: "") + "terminateOnException thrown")
+            println(e.stackTraceToString())
             throw e
         }
     }

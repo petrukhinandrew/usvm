@@ -61,6 +61,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import org.jacodb.api.jvm.ext.jvmSignature
 
 data class HandlerMethodData(
     val pathTemplate: String,
@@ -674,7 +675,7 @@ class JcSpringMethodApproximationResolver (
     private fun allControllerPaths(stateToFill: JcSpringState): ArrayList<ArrayList<Any>> {
         val handlerData =
             getHandlerData()
-            .filter { shouldAnalyzePath(it.pathTemplate, it.allowedMethods, it.controller.name) }
+            .filter { shouldAnalyzePath(it.pathTemplate, it.handler.jvmSignature, it.controller.name) }
         stateToFill.handlerData = handlerData
 
         return handlerData

@@ -3,24 +3,21 @@ package org.usvm.jvm.spring.runner
 import com.jetbrains.rd.framework.Protocol
 import com.jetbrains.rd.framework.base.RdExtBase
 import com.jetbrains.rd.framework.util.NetUtils
-import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.lifetime.isAlive
 import java.io.File
 import java.nio.file.Files
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
-import kotlinx.coroutines.withTimeout
 import org.usvm.instrumentation.executor.RdProcessRunnerBase
 import org.usvm.instrumentation.util.InstrumentationModuleConstants
 import org.usvm.instrumentation.util.UTestExecutorInitException
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
-import org.usvm.jmv.spring.models.AnalysisResponse
+import org.usvm.jmv.spring.models.ErrorDescriptor
 import org.usvm.jmv.spring.models.analysisProcessModel
 
+// TODO: get coroutine context as a parameter?
 class AnalysisRdProcessRunner(
     process: Process,
     checkProcessAliveDelay: Duration,
@@ -36,20 +33,28 @@ class AnalysisRdProcessRunner(
         return protocol.analysisProcessModel
     }
 
-    fun startAnalysisSync(request: AnalysisRequest, timeout: Duration): AnalysisResponse {
-        return model.runAnalysis.executeSync(request, timeout)
+    fun startAnalysis(request: AnalysisRequest) {
+        println("FIIIIIIRRRRREEEEE")
+        model.runAnalysis.fire(request)
     }
 
-    suspend fun startAnalysisAsync(request: AnalysisRequest): AnalysisResponse {
-        return model.runAnalysis.execute(request)
+    fun bindOnNewTest(callback: (String) -> Unit) {
+        model.newTestGenerated.advise(lifetime, callback)
+    }
+
+    fun bindOnError(callback: (ErrorDescriptor) -> Unit) {
+        model.errorOccured.advise(lifetime, callback)
     }
 }
 
+@Suppress("unused")
 class AnalysisProcessRunner: AutoCloseable {
 
     companion object {
         private const val localAgentPath =
             "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-concrete/agent/build/libs/agent.jar"
+        private const val localRunnerPath =
+            "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-spring-runner/build/libs/usvm-jvm-spring-runner-1.2.10.jar"
     }
 
     lateinit var rdProcessRunner: AnalysisRdProcessRunner
@@ -60,16 +65,21 @@ class AnalysisProcessRunner: AutoCloseable {
         lifetime.terminate()
     }
 
-    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean): Process {
+    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean, onNewTest: (String) -> Unit, onError: (ErrorDescriptor) -> Unit): Process {
         val port = NetUtils.findFreePort(0)
         val process = runJar(
             javaPath,
-            "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-spring-runner/build/libs/usvm-jvm-spring-runner-1.2.10.jar",
+            localRunnerPath,
             buildJvmArgs("org.usvm.jvm.spring.runner.AnalysisProcess", allowDebugging = allowDebugging) + listOf("-t", timeoutSeconds.toString(), "-p", port.toString())
         ) ?: error("cannot run jar")
         rdProcessRunner =
             AnalysisRdProcessRunner(process = process, checkProcessAliveDelay = 1.seconds, rdPort = port, lifetimeDefinition = lifetime)
         rdProcessRunner.init()
+        rdProcessRunner.bindOnError(onError)
+        rdProcessRunner.bindOnNewTest(onNewTest)
+
+        println("VSE ZBS, YA REGNUL")
+
         return process
     }
 
@@ -90,19 +100,9 @@ class AnalysisProcessRunner: AutoCloseable {
         }
     }
 
-    fun startAnalysisSync(request: AnalysisRequest, timeout: Duration): AnalysisResponse{
-        return rdProcessRunner.startAnalysisSync(request, timeout)
-    }
-
-    suspend fun startAnalysisAsync(request: AnalysisRequest): AnalysisResponse {
+    suspend fun startAnalysis(request: AnalysisRequest) {
         ensureRunnerAlive()
-        return try {
-            withTimeout(600.seconds) {
-                rdProcessRunner.startAnalysisAsync(request)
-            }
-        } catch (e: Exception) {
-            AnalysisResponse(null)
-        }
+        return rdProcessRunner.startAnalysis(request)
     }
 
     private val workingDir = Files.createTempDirectory("springAnalysis").toFile()
@@ -264,6 +264,7 @@ class AnalysisProcessRunner: AutoCloseable {
                             mainClazz
     }
 
+    @Suppress("SameParameterValue")
     private fun runJar(javaPath: String, jarPath: String, arguments: List<String>): Process? {
         val collectorsJarPath =
             "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-instrumentation/build/libs/usvm-jvm-instrumentation-collectors.jar"
@@ -281,7 +282,6 @@ class AnalysisProcessRunner: AutoCloseable {
             with(procBuilder.environment()) {
                 put("springDir", localSpringDir.absolutePath)
                 put("lambdaDir", localLambdaDir.absolutePath)
-//                put("usvm.jvm.springTestDeps.paths", springTestDeps)
                 put("usvm.jvm.api.jar.path", usvmJvmApi)
                 put("usvm.jvm.approximations.jar.path", approximations)
                 put("usvm-jvm-instrumentation-jar", instrumentationJarPath)

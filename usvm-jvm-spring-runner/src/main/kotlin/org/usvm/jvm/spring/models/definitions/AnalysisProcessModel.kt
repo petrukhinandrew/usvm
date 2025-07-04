@@ -3,10 +3,11 @@ package org.usvm.jvm.spring.models.definitions
 import com.jetbrains.rd.generator.nova.Ext
 import com.jetbrains.rd.generator.nova.PredefinedType
 import com.jetbrains.rd.generator.nova.async
-import com.jetbrains.rd.generator.nova.call
 import com.jetbrains.rd.generator.nova.field
 import com.jetbrains.rd.generator.nova.immutableList
+import com.jetbrains.rd.generator.nova.list
 import com.jetbrains.rd.generator.nova.nullable
+import com.jetbrains.rd.generator.nova.signal
 
 object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
     val analysisRequest = structdef {
@@ -22,13 +23,15 @@ object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
         field("testClassPackage", PredefinedType.string)
     }
 
-    val analysisResponse = structdef {
-        field("testClass", PredefinedType.string.nullable)
+    val errorDescriptor = structdef {
+        field("message", PredefinedType.string)
+        field("stackTrace", PredefinedType.string)
     }
 
     init {
-        call("runAnalysis", analysisRequest, analysisResponse).apply {
-            async
-        }
+        signal("runAnalysis", analysisRequest).async
+        signal("newTestGenerated", PredefinedType.string).async
+        signal("errorOccured", errorDescriptor).async
+        list("generatedTests", PredefinedType.string).async
     }
 }

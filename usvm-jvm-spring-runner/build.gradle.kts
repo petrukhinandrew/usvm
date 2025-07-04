@@ -48,7 +48,6 @@ val generatedModelsPackage = "org.usvm.jmv.spring.models"
 val generatedModelsSourceDir = sourcesBaseDir.resolve(generatedPackage.replace('.', '/'))
 
 val generateModels = tasks.register<RdGenTask>("generateAnalysisProtocolModels") {
-//    dependsOn.addAll(listOf("compileKotlin"))
     val rdParams = extensions.getByName("params") as RdGenExtension
     val sourcesDir = projectDir.resolve("src/main/kotlin").resolve("org/usvm/jvm/spring/models")
 

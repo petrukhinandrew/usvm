@@ -9,6 +9,7 @@ import com.jetbrains.rd.framework.Serializers
 import com.jetbrains.rd.framework.SocketWire
 import com.jetbrains.rd.framework.base.RdExtBase
 import com.jetbrains.rd.framework.impl.RdCall
+import com.jetbrains.rd.framework.impl.RdSignal
 import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.threading.SingleThreadScheduler
@@ -65,6 +66,9 @@ open class RdProcessRunnerBase(
             lifetime
         )
 
+        println("VSE ZBS, YA NACHAL")
+
+
         protocol.wire.connected.adviseForConditionAsync(lifetime).await()
 
         coroutineScope.launch(lifetime) {
@@ -89,6 +93,8 @@ open class RdProcessRunnerBase(
                 delay(20.milliseconds)
             }
         }
+
+        println("VSE ZBS, YA GOTOV")
 
         return RdServerProcess(process, lifetime, protocol, model)
     }
