@@ -9,25 +9,21 @@ import com.jetbrains.rd.framework.Protocol
 import com.jetbrains.rd.framework.Serializers
 import com.jetbrains.rd.framework.SocketWire
 import com.jetbrains.rd.framework.impl.RdCall
-import com.jetbrains.rd.framework.util.launch
 import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.reactive.IMutableViewableList
 import com.jetbrains.rd.util.reactive.IScheduler
-import com.jetbrains.rd.util.reactive.adviseEternal
 import com.jetbrains.rd.util.threading.SingleThreadScheduler
 import java.io.File
 import kotlin.system.measureNanoTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import machine.JcSpringAnalysisMode
@@ -68,17 +64,12 @@ class AnalysisProcess private constructor() {
             ?: 120.toDuration(DurationUnit.SECONDS)
         val port = cmd.getOptionValue("p").toIntOrNull() ?: error("Specify rd port number")
         val def = LifetimeDefinition()
-        println("proc: created def")
+
         def.terminateOnException {
-//            def.launch {
-//                checkAliveLoop(def, 1.seconds)
-//            }
-            println("proc: after check alive loop launch")
             initiate(def, port, timeout)
-            println("proc: after initiate")
+
             def.awaitTermination()
         }
-        println("proc: leaving")
     }
 
     private enum class State {
@@ -86,24 +77,6 @@ class AnalysisProcess private constructor() {
     }
 
     private val synchronizer = Channel<State>(capacity = 1)
-
-    private suspend fun checkAliveLoop(lifetime: LifetimeDefinition, timeout: Duration) {
-        var lastState = State.ENDED
-        while (true) {
-            val current = withTimeoutOrNull(timeout) {
-                synchronizer.receive()
-            }
-
-            if (current == null) {
-                if (lastState == State.ENDED) {
-                    lifetime.terminate()
-                    break
-                }
-            } else {
-                lastState = current
-            }
-        }
-    }
 
     private suspend fun initiate(lifetime: Lifetime, port: Int, timeout: Duration) {
         val scheduler = SingleThreadScheduler(lifetime, "usvm-analysis-worker-scheduler")
@@ -120,36 +93,29 @@ class AnalysisProcess private constructor() {
             protocol.syncProtocolModel
             protocol.analysisProcessModel
         }.await()
-        println("proc: model pumped kak nado")
         model.setup(timeout, lifetime, scheduler)
-        println("proc: model setup done")
         protocol.syncProtocolModel.synchronizationSignal.let { sync ->
             val answerFromMainProcess = sync.adviseForConditionAsync(lifetime) {
                 if (it == MAIN_PROCESS_NAME) {
-//                    measureExecutionForTermination {
                         sync.fire(CHILD_PROCESS_NAME)
-//                    }
-                    println("proc: true")
                     true
                 } else {
-                    println("proc: false")
                     false
                 }
             }
             answerFromMainProcess.await()
         }
-        println("proc: syncSig let")
     }
 
     private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime, scheduler: IScheduler) {
-//        val observer = JcSpringTestRdObserver(
-//            onNewTest = { render ->
-//                newTestGenerated.fire(render)
-//                generatedTests.add(render)
-//            },
-//            onError = { descr -> errorOccured.fire(descr) }
-//        )
-//        println("proc: obs created")
+        val observer = JcSpringTestRdObserver(
+            onNewTest = { render ->
+                newTestGenerated.fire(render)
+                generatedTests.add(render)
+            },
+            onError = { descr -> errorOccured.fire(descr) }
+        )
+
         runAnalysis.advise(lifetime) { request ->
 //            runConcreteAnalysis(observer, request, runnerTimeout)
             println("proc: signal received")
@@ -186,6 +152,7 @@ class AnalysisProcess private constructor() {
                 val msg = "$it'th test for requested ${request.testClassName}"
                 println(msg)
                 tests.add(msg)
+                runBlocking { delay(3000L) }
             }
         }
         catch (e: Throwable) {

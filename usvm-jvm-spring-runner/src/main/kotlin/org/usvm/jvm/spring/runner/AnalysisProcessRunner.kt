@@ -24,7 +24,7 @@ class AnalysisRdProcessRunner(
     rdPort: Int,
     lifetimeDefinition: LifetimeDefinition
 ) : RdProcessRunnerBase("usvm-spring-analysis", process, checkProcessAliveDelay, rdPort, lifetimeDefinition) {
-    private val model get() = rdProcess.model as AnalysisProcessModel
+    val model get() = rdProcess.model as AnalysisProcessModel
 
     val isAlive get() = lifetime.isAlive
 
@@ -59,7 +59,7 @@ class AnalysisProcessRunner: AutoCloseable {
 
     lateinit var rdProcessRunner: AnalysisRdProcessRunner
 
-    private val lifetime = LifetimeDefinition()
+    val lifetime = LifetimeDefinition()
 
     override fun close() {
         lifetime.terminate()
