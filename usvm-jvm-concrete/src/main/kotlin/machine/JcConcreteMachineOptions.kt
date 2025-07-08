@@ -31,10 +31,11 @@ data class JcBuildDirsConcreteMachineOptionsImpl(
 }
 
 class JcJarConcreteMachineOptions(
-    jarPath: String
+    jarPath: String,
+    val extraUserClasses: Set<String> = emptySet()
 ): JcConcreteMachineOptions {
     override fun userClassesIn(cp: JcClasspath): Sequence<JcClassOrInterface> {
-        return userClasses.asSequence().mapNotNull { cp.findClassOrNull(it) }
+        return (userClasses + extraUserClasses).asSequence().mapNotNull { cp.findClassOrNull(it) }
     }
 
     override fun isUserClass(clazz: JcClassOrInterface): Boolean = userClasses.contains(clazz.name)

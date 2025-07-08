@@ -3,6 +3,7 @@ package org.usvm.jvm.spring.runner
 import bench.analyzeBench
 import bench.generateTestClass
 import bench.loadBenchCp
+import bench.loadBenchCpFromJar
 import com.jetbrains.rd.framework.IdKind
 import com.jetbrains.rd.framework.Identities
 import com.jetbrains.rd.framework.Protocol
@@ -109,6 +110,7 @@ class AnalysisProcess private constructor() {
 
     private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime, scheduler: IScheduler) {
         val observer = JcSpringTestRdObserver(
+
             onNewTest = { render ->
                 newTestGenerated.fire(render)
                 generatedTests.add(render)
@@ -117,20 +119,21 @@ class AnalysisProcess private constructor() {
         )
 
         runAnalysis.advise(lifetime) { request ->
-//            runConcreteAnalysis(observer, request, runnerTimeout)
-            println("proc: signal received")
-            runAnalysisMock(request, generatedTests)
+            runConcreteAnalysis(observer, request, runnerTimeout)
+//            println("proc: signal received")
+//            runAnalysisMock(request, generatedTests)
         }
     }
 
     private fun runConcreteAnalysis(observer: JcSpringTestRdObserver, request: AnalysisRequest, runnerTimeout: Duration) {
         bindRequest(request)
         val springAnalysisMode = JcSpringAnalysisMode.SpringBootTest
-
+        println("running concrete analysis")
 
         val benchCp = logTime("Init jacodb") {
-            loadBenchCp(request.userClassPath.map { File(it) }, request.libsClassPath.map { File(it) })
+            loadBenchCpFromJar(request.userClassPath.first { it.endsWith(".jar")}, request.libsClassPath)
         }
+
         val newBench = generateTestClass(benchCp, springAnalysisMode, request.analysisBootApp)
 
         newBench.use { bench ->

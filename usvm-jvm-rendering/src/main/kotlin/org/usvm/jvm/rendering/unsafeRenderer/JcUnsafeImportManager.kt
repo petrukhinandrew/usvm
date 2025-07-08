@@ -2,20 +2,25 @@ package org.usvm.jvm.rendering.unsafeRenderer
 
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.expr.SimpleName
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.baseRenderer.JcImportManager
 
 open class JcUnsafeImportManager(
     cu: CompilationUnit? = null,
-    private val shouldInlineUsvmUtils: Boolean = false
+    private val utilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
 ) : JcImportManager(cu) {
     var usvmUtilsImported = false
-        get private set
+        private set
 
-    val usvmUtilsName: SimpleName by lazy {
+    val usvmUtilsScopeName: SimpleName? by lazy {
         usvmUtilsImported = true
-        if (add(ReflectionUtilName.USVM))
-            SimpleName(ReflectionUtilName.USVM_SIMPLE)
-        else SimpleName(ReflectionUtilName.USVM)
+        when {
+            utilsInlineStrategy is ReflectionUtilsInlineStrategy.Inline -> null
+            utilsInlineStrategy is ReflectionUtilsInlineStrategy.OuterClass ||
+            utilsInlineStrategy is ReflectionUtilsInlineStrategy.NestedClass -> SimpleName(ReflectionUtilName.USVM_SIMPLE)
+            add(ReflectionUtilName.USVM) -> SimpleName(ReflectionUtilName.USVM_SIMPLE)
+            else -> SimpleName(ReflectionUtilName.USVM)
+        }
     }
 
     override fun add(
@@ -26,7 +31,7 @@ open class JcUnsafeImportManager(
     ): Boolean {
         val isUsvmUtil = "${packageName}.${simpleName}" == ReflectionUtilName.USVM
 
-        if (shouldInlineUsvmUtils && isUsvmUtil)
+        if (utilsInlineStrategy.shouldCollectUtilUsage && isUsvmUtil)
             return true
 
         return super.add(packageName, simpleName, packages, names)

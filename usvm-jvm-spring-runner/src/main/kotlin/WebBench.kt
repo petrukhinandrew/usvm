@@ -84,7 +84,7 @@ import machine.JcJarConcreteMachineOptions
 
 private fun loadBenchFromJar(): BenchCp {
     val jarPath = "/Users/petrukhinandrew/IdeaProjects/spring-petclinic/build/libs/spring-petclinic-3.2.0.jar"
-    return loadBenchCpFromJar(jarPath)
+    return loadBenchCpFromJar(jarPath, listOf())
 }
 
 fun main() {
@@ -218,7 +218,8 @@ private fun loadBench(
     dependencies: List<File>,
     isPureClasspath: Boolean = true,
     tablesInfo: JcTableInfoCollector? = null,
-    testKind: JcSpringTestKind? = null
+    testKind: JcSpringTestKind? = null,
+    extraUserClassNames: Set<String> = emptySet()
 ) = runBlocking {
     val features = mutableListOf(
         UnknownClasses,
@@ -246,7 +247,7 @@ private fun loadBench(
     BenchCp(
         cp,
         db,
-        JcBuildDirsConcreteMachineOptionsImpl(classLocations, depsLocations),
+        JcJarConcreteMachineOptions(cpFiles.first { it.extension == "jar" }.absolutePath, extraUserClassNames),
         cpFiles,
         classes,
         dependencies,
@@ -254,20 +255,15 @@ private fun loadBench(
     )
 }
 
-private fun loadBenchCpFromJar(jarPath: String): BenchCp = runBlocking {
-    val springTestDeps =
-        System.getenv("usvm.jvm.springTestDeps.paths")
-            .split(";")
-            .map { File(it) }
-
+fun loadBenchCpFromJar(jarPath: String, deps: List<String>): BenchCp = runBlocking {
     val bootJar = File(jarPath)
     check(bootJar.exists()) { "Bad boot jar path" }
     val usvmConcreteApiJarPath = File(System.getenv("usvm.jvm.concrete.api.jar.path"))
     check(usvmConcreteApiJarPath.exists()) { "Concrete API jar does not exist" }
 
     val cpFiles = mutableListOf(bootJar, usvmConcreteApiJarPath)
-    // TODO: add springTestDeps only if user's dependencies do not contain them
-    cpFiles += springTestDeps
+    val depFiles = deps.map { File(it) }
+    cpFiles += depFiles
 
     val db = jacodb {
         useProcessJavaRuntime()
@@ -279,26 +275,24 @@ private fun loadBenchCpFromJar(jarPath: String): BenchCp = runBlocking {
         installFeatures(Approximations)
 
         loadByteCode(cpFiles)
-
-//        val persistenceLocation = classes.first().parentFile.resolve("jcdb.db")
-//        persistent(persistenceLocation.absolutePath)
     }
 
     db.awaitBackgroundJobs()
-    loadBenchFromJar(db, cpFiles, jarPath, listOf(bootJar), springTestDeps, true)
+    loadBenchFromJar(db, cpFiles, jarPath, listOf(bootJar), depFiles, true)
 }
+
 fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
-    val springTestDeps =
-        System.getenv("usvm.jvm.springTestDeps.paths")
-            .split(";")
-            .map { File(it) }
+//    val springTestDeps =
+//        System.getenv("usvm.jvm.springTestDeps.paths")
+//            .split(";")
+//            .map { File(it) }
 
     val usvmConcreteApiJarPath = File(System.getenv("usvm.jvm.concrete.api.jar.path"))
     check(usvmConcreteApiJarPath.exists()) { "Concrete API jar does not exist" }
 
     var cpFiles = classes + dependencies + usvmConcreteApiJarPath
     // TODO: add springTestDeps only if user's dependencies do not contain them
-    cpFiles += springTestDeps
+//    cpFiles += springTestDeps
 
     val db = jacodb {
         useProcessJavaRuntime()
@@ -528,6 +522,10 @@ fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMo
         benchmark.db.load(springDirFile)
         benchmark.db.awaitBackgroundJobs()
     }
+    benchmark.cp.locations.map {
+        it.classNames // org.spring..
+        // BOOT_INF.classes.
+    }
     val newCpFiles = benchmark.cpFiles + springDirFile
     val newClasses = benchmark.classes + springDirFile
     return loadBench(
@@ -537,7 +535,8 @@ fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMo
         benchmark.dependencies,
         false,
         tablesInfo,
-        testKind
+        testKind,
+        setOf(newStartSpringName)
     )
 }
 
@@ -648,15 +647,6 @@ private fun reproduceTests(
 
     println("Reproduced ${reproducedTests.size} of ${tests.size} tests")
 }
-
-private fun JcClasspath.nonAbstractClasses(locations: List<JcByteCodeLocation>): Sequence<JcClassOrInterface> =
-    locations
-        .asSequence()
-        .flatMap { it.classNames ?: emptySet() }
-        .mapNotNull { findClassOrNull(it) }
-        .filterNot { it is JcUnknownClass }
-        .filterNot { it.isAbstract || it.isInterface || it.isAnonymous }
-        .sortedBy { it.name }
 
 private fun <T> logTime(message: String, body: () -> T): T {
     val result: T

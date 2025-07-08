@@ -3,25 +3,51 @@ package org.usvm.jvm.rendering.spring.unitTestRenderer
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration
 import org.jacodb.api.jvm.JcClasspath
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.spring.JcSpringImportManager
 import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeTestFileRenderer
 
 open class JcSpringUnitTestFileRenderer: JcUnsafeTestFileRenderer {
     override val importManager: JcSpringImportManager
         get() = super.importManager as JcSpringImportManager
-    protected constructor(cu: CompilationUnit, importManager: JcSpringImportManager, cp: JcClasspath) : super(cu, importManager, cp)
 
-    protected constructor(packageName: String?, importManager: JcSpringImportManager, cp: JcClasspath) : super(packageName, importManager, cp)
-
-    constructor(cu: CompilationUnit, cp: JcClasspath, inlineUsvmUtils: Boolean = false) : this(
+    protected constructor(
+        cu: CompilationUnit,
+        importManager: JcSpringImportManager,
+        cp: JcClasspath
+    ) : super(
         cu,
-        JcSpringImportManager(cu, inlineUsvmUtils),
+        importManager,
         cp
     )
 
-    constructor(packageName: String?, cp: JcClasspath, inlineUsvmUtils: Boolean = false) : this(
+    protected constructor(
+        packageName: String?,
+        importManager: JcSpringImportManager,
+        cp: JcClasspath
+    ) : super(
         packageName,
-        JcSpringImportManager(null, inlineUsvmUtils),
+        importManager,
+        cp
+    )
+
+    constructor(
+        cu: CompilationUnit,
+        cp: JcClasspath,
+        reflectionUtilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
+    ) : this(
+        cu,
+        JcSpringImportManager(cu, reflectionUtilsInlineStrategy),
+        cp
+    )
+
+    constructor(
+        packageName: String?,
+        cp: JcClasspath,
+        reflectionUtilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
+    ) : this(
+        packageName,
+        JcSpringImportManager(null, reflectionUtilsInlineStrategy),
         cp
     )
 

@@ -2,16 +2,17 @@ package org.usvm.jvm.rendering.spring
 
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.expr.SimpleName
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeImportManager
 import org.usvm.jvm.rendering.unsafeRenderer.ReflectionUtilName
 
 class JcSpringImportManager(
     cu: CompilationUnit? = null,
-    inlineUsvmUtils: Boolean = true
-) : JcUnsafeImportManager(cu, inlineUsvmUtils) {
+    utilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
+) : JcUnsafeImportManager(cu, utilsInlineStrategy) {
 
     var springUtilsImported = false
-        get private set
+        private set
 
     val springUtilsName: SimpleName by lazy {
         springUtilsImported = true

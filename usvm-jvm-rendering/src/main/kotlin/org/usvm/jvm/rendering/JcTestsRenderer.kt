@@ -19,7 +19,11 @@ class JcTestsRenderer {
         JcDeadCodeTransformer()
     )
 
-    fun renderTests(cp: JcClasspath, tests: List<Pair<UTest, JcTestInfo>>, shouldInlineUsvmUtils: Boolean): Map<JcTestClassInfo, String> {
+    fun renderTests(
+        cp: JcClasspath,
+        tests: List<Pair<UTest, JcTestInfo>>,
+        reflectionUtilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
+    ): Map<JcTestClassInfo, String> {
         val renderedFiles = mutableMapOf<JcTestClassInfo, String>()
         val testClasses = tests.groupBy { (_, info) -> JcTestClassInfo.from(info) }
         val printer = DefaultPrettyPrinter()
@@ -33,7 +37,7 @@ class JcTestsRenderer {
                         StaticJavaParser.parse(testFile),
                         cp,
                         testClassInfo,
-                        shouldInlineUsvmUtils
+                        reflectionUtilsInlineStrategy
                     )
                 }
                 else -> {
@@ -41,7 +45,7 @@ class JcTestsRenderer {
                         testClassInfo.testPackageName,
                         cp,
                         testClassInfo,
-                        shouldInlineUsvmUtils
+                        reflectionUtilsInlineStrategy
                     )
                 }
             }

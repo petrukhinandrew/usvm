@@ -10,12 +10,11 @@ dependencies {
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.3")
 }
 
-java {
-    withSourcesJar()
-}
-
 tasks.withType<ProcessResources> {
-    val reflectionUtils = project.sourceSets.main.get().java.find { file -> file.name == "ReflectionUtils.java" }
+    val reflectionUtils = project.sourceSets.main.get().java.find { file ->
+        file.name == "ReflectionUtils.java"
+    }
+
     from(reflectionUtils)
 }
 

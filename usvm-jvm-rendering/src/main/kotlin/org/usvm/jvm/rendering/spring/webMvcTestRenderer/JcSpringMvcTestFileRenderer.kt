@@ -4,6 +4,7 @@ import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration
 import org.jacodb.api.jvm.JcClassType
 import org.jacodb.api.jvm.JcClasspath
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.spring.unitTestRenderer.JcSpringUnitTestFileRenderer
 import org.usvm.jvm.rendering.spring.JcSpringImportManager
 
@@ -30,11 +31,11 @@ class JcSpringMvcTestFileRenderer : JcSpringUnitTestFileRenderer {
         controller: JcClassType,
         cu: CompilationUnit,
         cp: JcClasspath,
-        inlineUsvmUtils: Boolean = false
+        reflectionUtilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
     ) : this(
         controller,
         cu,
-        JcSpringImportManager(cu, inlineUsvmUtils),
+        JcSpringImportManager(cu, reflectionUtilsInlineStrategy),
         cp
     )
 
@@ -42,11 +43,11 @@ class JcSpringMvcTestFileRenderer : JcSpringUnitTestFileRenderer {
         controller: JcClassType,
         packageName: String?,
         cp: JcClasspath,
-        inlineUsvmUtils: Boolean = false
+        reflectionUtilsInlineStrategy: ReflectionUtilsInlineStrategy = ReflectionUtilsInlineStrategy.NoInline
     ) : this(
         controller,
         packageName,
-        JcSpringImportManager(null, inlineUsvmUtils),
+        JcSpringImportManager(null, reflectionUtilsInlineStrategy),
         cp
     )
 

@@ -2,6 +2,7 @@
 import org.jacodb.api.jvm.JcMethod
 import org.usvm.jvm.rendering.JcTestClassInfo
 import org.usvm.jvm.rendering.JcTestsRenderer
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
 import org.usvm.jvm.rendering.testRenderer.JcTestInfo
 import org.usvm.test.api.UTest
@@ -13,11 +14,11 @@ class SpringTestRenderer(
 
     fun render(test: UTest, method: JcMethod, isExceptional: Boolean): String {
         val info = JcSpringMvcTestInfo(method, isExceptional)
-        val result = renderer.renderTests(cp, listOf(test to info), true)
+        val result = renderer.renderTests(cp, listOf(test to info), ReflectionUtilsInlineStrategy.NestedClass)
         return result.entries.single().value
     }
 
     fun render(tests: List<Pair<UTest, JcTestInfo>>): Map<JcTestClassInfo, String> {
-        return renderer.renderTests(cp, tests, true)
+        return renderer.renderTests(cp, tests, ReflectionUtilsInlineStrategy.NestedClass)
     }
 }
