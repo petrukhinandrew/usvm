@@ -78,8 +78,6 @@ class AnalysisProcessRunner: AutoCloseable {
         rdProcessRunner.bindOnError(onError)
         rdProcessRunner.bindOnNewTest(onNewTest)
 
-        println("VSE ZBS, YA REGNUL")
-
         return process
     }
 

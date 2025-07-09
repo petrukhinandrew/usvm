@@ -66,9 +66,6 @@ open class RdProcessRunnerBase(
             lifetime
         )
 
-        println("VSE ZBS, YA NACHAL")
-
-
         protocol.wire.connected.adviseForConditionAsync(lifetime).await()
 
         coroutineScope.launch(lifetime) {
@@ -93,8 +90,6 @@ open class RdProcessRunnerBase(
                 delay(20.milliseconds)
             }
         }
-
-        println("VSE ZBS, YA GOTOV")
 
         return RdServerProcess(process, lifetime, protocol, model)
     }

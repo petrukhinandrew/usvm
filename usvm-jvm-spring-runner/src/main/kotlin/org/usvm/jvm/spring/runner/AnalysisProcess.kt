@@ -121,7 +121,6 @@ class AnalysisProcess private constructor() {
             println("proc: signal received")
             runAnalysisMock(request, generatedTests)
         }
-        println("proc: run adviced")
     }
 
     private fun runConcreteAnalysis(observer: JcSpringTestRdObserver, request: AnalysisRequest, runnerTimeout: Duration) {

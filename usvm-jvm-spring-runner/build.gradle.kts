@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
     implementation(project(":usvm-jvm"))
-    implementation(project(":usvm-jvm-instrumentation"))
+    api(project(":usvm-jvm-instrumentation"))
     implementation(project(":usvm-jvm-concrete"))
     implementation(project(":usvm-jvm-spring"))
     implementation(project(":usvm-jvm-spring:usvm-jvm-spring-test-api"))
