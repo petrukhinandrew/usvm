@@ -70,7 +70,6 @@ import org.jacodb.api.jvm.ext.isAssignable
 import org.jacodb.api.jvm.ext.jcdbSignature
 import org.jacodb.impl.features.classpaths.virtual.JcVirtualMethod
 import org.usvm.jvm.rendering.isVararg
-import org.usvm.jvm.util.toJcClass
 import org.usvm.jvm.util.toTypedMethod
 import org.usvm.test.api.UTestAssertEqualsCall
 import org.usvm.test.api.UTestAssertThrowsCall
@@ -366,7 +365,7 @@ open class JcTestBlockRenderer protected constructor(
     )
 
     open fun renderClassExpression(expr: UTestClassExpression): Expression =
-        renderClassExpression(expr.type.toJcClass() as JcClassType)
+        renderClassExpression(expr.type)
 
     open fun renderBooleanExpression(expr: UTestBooleanExpression): Expression = renderBooleanPrimitive(expr.value)
 
