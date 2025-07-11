@@ -49,10 +49,10 @@ class JcJarConcreteMachineOptions(
     init {
         JarFile(jarPath).use { jarFile ->
             val classesPrefix =
-                checkNotNull(jarFile.manifest.mainAttributes[SPRING_BOOT_CLASSES_ATTRIBUTE] as? String) {
-                    "cannot fetch $SPRING_BOOT_CLASSES_ATTRIBUTE from manifest"
-                }
-
+                jarFile.manifest.mainAttributes.getValue(SPRING_BOOT_CLASSES_ATTRIBUTE)
+            check(classesPrefix.isNotBlank()) {
+                "$SPRING_BOOT_CLASSES_ATTRIBUTE is blank"
+            }
             userClasses = jarFile.entries().asSequence().mapNotNull { entry ->
                 val entryName = entry.name
                 if (entryName.startsWith(classesPrefix) && entryName.endsWith(CLASS_SUFFIX)) {

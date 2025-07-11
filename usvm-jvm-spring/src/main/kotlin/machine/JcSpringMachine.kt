@@ -3,6 +3,7 @@ package machine
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.cfg.JcInst
+import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.jacodb.impl.features.classpaths.JcUnknownMethod
 import org.usvm.UMachineOptions
 import org.usvm.UPathSelector
@@ -48,17 +49,11 @@ class JcSpringMachine(
     }
 
     override fun methodsToTrackCoverage(methods: List<JcMethod>): Set<JcMethod> {
-        val res = mutableSetOf<JcMethod>()
-        val classes = jcConcreteMachineOptions.userClassesIn(ctx.cp)
-        for (clazz in classes) {
-            if (!clazz.isSpringController && !clazz.isSpringFilter && !clazz.isSpringHandlerInterceptor)
-                continue
-            val methods = clazz.declaredMethods
-            methods.filterTo(res) {
-                it !is JcUnknownMethod && !it.isConstructor
-            }
-        }
-        return res
+        return jcConcreteMachineOptions.userClassesIn(ctx.cp)
+            .filter { it !is JcUnknownClass && (it.isSpringController || it.isSpringFilter || it.isSpringHandlerInterceptor) }
+            .flatMap { it.declaredMethods }
+            .filterNot { it is JcUnknownMethod || it.isConstructor }
+            .toSet()
     }
 
     @Suppress("UNCHECKED_CAST")

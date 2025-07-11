@@ -21,10 +21,8 @@ import org.jacodb.api.jvm.ext.boolean
 import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.findType
 import org.jacodb.api.jvm.ext.isAssignable
-import org.jacodb.api.jvm.ext.isSubClassOf
 import org.jacodb.api.jvm.ext.objectType
 import org.jacodb.api.jvm.ext.toType
-import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.jacodb.api.jvm.ext.void
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
@@ -43,7 +41,6 @@ import org.usvm.machine.JcApplicationGraph
 import org.usvm.machine.JcConcreteMethodCallInst
 import org.usvm.machine.JcContext
 import org.usvm.machine.JcMethodCall
-import org.usvm.machine.JcVirtualMethodCallInst
 import org.usvm.machine.USizeSort
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.skipMethodInvocationWithValue
@@ -51,7 +48,6 @@ import org.usvm.memory.UMemory
 import org.usvm.jvm.util.findJavaField
 import org.usvm.sizeSort
 import util.isDeserializationMethod
-import util.isGrantedAuthority
 import util.isSpringController
 import util.isSpringRepository
 import utils.toJcType
@@ -59,7 +55,10 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
 import org.jacodb.api.jvm.ext.jvmSignature
+import org.jacodb.impl.features.hierarchyExt
+import org.usvm.machine.JcVirtualMethodCallInst
 
 data class HandlerMethodData(
     val pathTemplate: String,
@@ -149,10 +148,6 @@ class JcSpringMethodApproximationResolver (
 
         if (enclosingClass == ctx.stringType) {
             if (approximateStringMethod(methodCall)) return true
-        }
-
-        if (enclosingClass.isGrantedAuthority) {
-            if (approximateGrantedAuthorityMethod(methodCall)) return true
         }
 
         return false
@@ -706,17 +701,20 @@ class JcSpringMethodApproximationResolver (
     private fun getTypeOfUser(): Class<*> {
         val userDetailsClass = ctx.cp
             .findClass("org.springframework.security.core.userdetails.UserDetails")
-        val fallbackUserType = ctx.cp
+
+        val userClass = runBlocking { ctx.cp.hierarchyExt() }
+            .findSubClasses(userDetailsClass, entireHierarchy = true, includeOwn = false)
+            .filter { jcConcreteMachineOptions.isUserClass(it) }
+            .firstOrNull { !it.name.startsWith("org.springframework.security") }
+            ?.toJavaClass(JcConcreteMemoryClassLoader)
+
+        if (userClass != null)
+            return userClass
+
+        val fallbackUserClass = ctx.cp
             .findClass("org.springframework.security.core.userdetails.User")
             .toJavaClass(JcConcreteMemoryClassLoader)
-        val nonAbstractClasses = ctx.cp.locations
-            .asSequence()
-            .flatMap { it.classNames ?: emptySet() }
-            .mapNotNull { ctx.cp.findClassOrNull(it) }
-            .filterNot { it is JcUnknownClass || it.isAbstract || it.isInterface || it.isAnonymous }
-        val userClass = nonAbstractClasses.firstOrNull { it.isSubClassOf(userDetailsClass) }
-        val foundUserType = userClass?.toJavaClass(JcConcreteMemoryClassLoader)
-        return foundUserType ?: fallbackUserType
+        return fallbackUserClass
     }
 
     private fun approximateSpringEngineStaticMethod(methodCall: JcMethodCall): Boolean = with(methodCall) {
