@@ -2,7 +2,6 @@ package org.usvm.util
 
 import org.jacodb.api.jvm.*
 import org.jacodb.api.jvm.cfg.JcInst
-import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.USort
@@ -12,14 +11,6 @@ import org.usvm.memory.ULValue
 import org.usvm.memory.UWritableMemory
 import org.usvm.uctx
 import kotlin.reflect.KClass
-
-fun JcContext.classesOfLocations(locations: List<JcByteCodeLocation>): Sequence<JcClassOrInterface> {
-    return locations
-        .asSequence()
-        .flatMap { it.classNames ?: emptySet() }
-        .mapNotNull { cp.findClassOrNull(it) }
-        .filterNot { it is JcUnknownClass }
-}
 
 fun JcContext.extractJcType(clazz: KClass<*>): JcType = cp.findTypeOrNull(clazz.qualifiedName!!)!!
 

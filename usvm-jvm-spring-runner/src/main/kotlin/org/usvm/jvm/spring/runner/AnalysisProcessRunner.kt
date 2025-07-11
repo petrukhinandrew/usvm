@@ -61,6 +61,8 @@ class AnalysisProcessRunner: AutoCloseable {
 
     val lifetime = LifetimeDefinition()
 
+    val model: AnalysisProcessModel get() = rdProcessRunner.model
+
     override fun close() {
         lifetime.terminate()
     }

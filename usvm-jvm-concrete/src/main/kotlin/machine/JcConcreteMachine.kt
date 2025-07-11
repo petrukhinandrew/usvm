@@ -21,7 +21,7 @@ open class JcConcreteMachine(
     cp: JcClasspath,
     options: UMachineOptions,
     jcMachineOptions: JcMachineOptions = JcMachineOptions(),
-    protected val jcConcreteMachineOptions: JcConcreteMachineOptions = JcConcreteMachineOptions(),
+    protected val jcConcreteMachineOptions: JcConcreteMachineOptions = JcBuildDirsConcreteMachineOptionsImpl(),
     interpreterObserver: JcInterpreterObserver? = null,
 ) : JcMachine(cp, options, jcMachineOptions, interpreterObserver) {
 

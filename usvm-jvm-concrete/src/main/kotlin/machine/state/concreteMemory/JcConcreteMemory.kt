@@ -568,7 +568,7 @@ open class JcConcreteMemory(
         }
 
         // TODO: change on checking coverage zone #CM
-        if (jcConcreteMachineOptions.isProjectLocation(method))
+        if (jcConcreteMachineOptions.isUserClass(method.enclosingClass))
             return TryConcreteInvokeFail(false)
 
         val parameterInfos = method.parameters

@@ -18,9 +18,6 @@ import org.usvm.statistics.TimeStatistics
 import org.usvm.statistics.UMachineObserver
 import org.usvm.statistics.collectors.StatesCollector
 import org.usvm.statistics.distances.CallGraphStatistics
-import org.usvm.util.classesOfLocations
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import util.isSpringController
 import util.isSpringFilter
 import util.isSpringHandlerInterceptor
@@ -52,7 +49,7 @@ class JcSpringMachine(
 
     override fun methodsToTrackCoverage(methods: List<JcMethod>): Set<JcMethod> {
         val res = mutableSetOf<JcMethod>()
-        val classes = ctx.classesOfLocations(jcConcreteMachineOptions.projectLocations)
+        val classes = jcConcreteMachineOptions.userClassesIn(ctx.cp)
         for (clazz in classes) {
             if (!clazz.isSpringController && !clazz.isSpringFilter && !clazz.isSpringHandlerInterceptor)
                 continue

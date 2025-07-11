@@ -3,7 +3,6 @@ package org.usvm.jvm.spring.models
 import machine.JcSpringTestObserver
 import machine.state.JcSpringState
 import org.usvm.jmv.spring.models.ErrorDescriptor
-import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestRenderer
 import testGeneration.SpringTestInfo
 import testGeneration.canGenerateTest
 import testGeneration.generateTest
@@ -23,6 +22,6 @@ class JcSpringTestRdObserver(private val onNewTest: (String) -> Unit, private va
     }
 
     private fun renderSingleTest(testInfo: SpringTestInfo): String {
-        JcSpringMvcTestRenderer
+        return "single test render"
     }
 }

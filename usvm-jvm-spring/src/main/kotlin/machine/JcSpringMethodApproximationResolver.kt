@@ -46,12 +46,10 @@ import org.usvm.machine.JcMethodCall
 import org.usvm.machine.JcVirtualMethodCallInst
 import org.usvm.machine.USizeSort
 import org.usvm.machine.state.newStmt
-import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.skipMethodInvocationWithValue
 import org.usvm.memory.UMemory
 import org.usvm.jvm.util.findJavaField
 import org.usvm.sizeSort
-import org.usvm.util.classesOfLocations
 import util.isDeserializationMethod
 import util.isGrantedAuthority
 import util.isSpringController
@@ -648,7 +646,7 @@ class JcSpringMethodApproximationResolver (
     }
 
     private fun getHandlerData(): List<HandlerMethodData> {
-        val controllerTypes = ctx.classesOfLocations(jcConcreteMachineOptions.projectLocations)
+        val controllerTypes = jcConcreteMachineOptions.userClassesIn(ctx.cp)
             .filter { !it.isAbstract && !it.isInterface && !it.isAnonymous && it.isSpringController }
             .filterNot { shouldSkipController(it) }
 

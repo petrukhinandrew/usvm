@@ -17,11 +17,12 @@ import kotlin.io.path.walk
 import kotlin.system.exitProcess
 import kotlin.system.measureNanoTime
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
+import machine.JcBuildDirsConcreteMachineOptionsImpl
 import machine.JcConcreteMachineOptions
+import machine.JcJarConcreteMachineOptions
 import machine.JcSpringAnalysisMode
 import machine.JcSpringMachine
 import machine.JcSpringMachineOptions
@@ -134,8 +135,7 @@ data class BenchTarget(val ctlName: String, val path: String, val handle: String
 }
 
 private fun collectBenchTargets(benchCp: BenchCp): List<BenchTarget> {
-    val userControllers = benchCp.cp.nonAbstractClasses(benchCp.classLocations)
-        .filter { it.hasAnnotation(ctlAnnotation) }
+    val userControllers = benchCp.nonAbstractUserClasses().filter { it.hasAnnotation(ctlAnnotation) }
     val collected = userControllers.flatMap { ctl ->
         ctl.declaredMethods.mapNotNull { handle ->
             BenchTarget.fromHandle(handle)
@@ -147,8 +147,7 @@ private fun collectBenchTargets(benchCp: BenchCp): List<BenchTarget> {
 class BenchCp(
     val cp: JcClasspath,
     val db: JcDatabase,
-    val classLocations: List<JcByteCodeLocation>,
-    val depsLocations: List<JcByteCodeLocation>,
+    val concreteMachineOptions: JcConcreteMachineOptions,
     val cpFiles: List<File>,
     val classes: List<File>,
     val dependencies: List<File>,
@@ -159,8 +158,15 @@ class BenchCp(
         db.close()
     }
 
-    fun bindMachineOptions(options: JcConcreteMachineOptions) {
-        (cp.features?.find { it is JcRepositoryTransformer } as? JcRepositoryTransformer)?.bindMachineOptions(options)
+    init {
+        bindMachineOptions()
+    }
+    private fun bindMachineOptions() {
+        (cp.features?.find { it is JcRepositoryTransformer } as? JcRepositoryTransformer)?.bindMachineOptions(concreteMachineOptions)
+    }
+
+    fun nonAbstractUserClasses(): Sequence<JcClassOrInterface> {
+        return concreteMachineOptions.userClassesIn(cp).filterNot { it.isAbstract || it.isInterface || it.isAnonymous }
     }
 }
 
@@ -196,7 +202,15 @@ private fun loadBench(
 
     val classLocations = cp.locations.filter { it.path in classes.map { it.path } }
     val depsLocations = cp.locations.filter { it.path in dependencies.map { file -> file.path } }
-    BenchCp(cp, db, classLocations, depsLocations, cpFiles, classes, dependencies, testKind)
+    BenchCp(
+        cp,
+        db,
+        JcBuildDirsConcreteMachineOptionsImpl(classLocations, depsLocations),
+        cpFiles,
+        classes,
+        dependencies,
+        testKind
+    )
 }
 
 fun loadBenchCp(classes: List<File>, dependencies: List<File>): BenchCp = runBlocking {
@@ -355,13 +369,12 @@ fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMo
 
     val springDirFile = File(System.getenv("springDir"))
     check(springDirFile.exists()) { "Generated directory ${springDirFile.absolutePath} does not exist" }
-    val classLocations = benchmark.classLocations
-    val nonAbstractClasses = cp.nonAbstractClasses(classLocations)
+    val nonAbstractClasses = benchmark.nonAbstractUserClasses()
 
     val repositoryType = cp.findClassOrNull("org.springframework.data.repository.Repository") ?: error("cannot find Repository class")
     val repositories = runBlocking { cp.hierarchyExt() }
         .findSubClasses(repositoryType, entireHierarchy = true, includeOwn = false)
-        .filter { classLocations.contains(it.declaration.location.jcLocation) }
+        .filter { benchmark.concreteMachineOptions.isUserClass(it) }
         .toList() + allByAnnotation(nonAbstractClasses, "org.springframework.stereotype.Repository")
     val entityManagerType = cp.findClassOrNull("jakarta.persistence.EntityManager")
     val hasJpa = false // repositories.isNotEmpty() || entityManagerType != null && entityManagerType !is JcUnknownClass
@@ -455,17 +468,12 @@ fun generateTestClass(benchmark: BenchCp, springAnalysisMode: JcSpringAnalysisMo
 }
 
 fun analyzeBench(newBench: BenchCp, springAnalysisMode: JcSpringAnalysisMode, runnerTimeout: Duration, springBootApp: String? = null, testObserver: JcSpringTestObserver = JcSpringTestObserver()): List<SpringTestInfo> {
-    val jcConcreteMachineOptions = JcConcreteMachineOptions(
-        projectLocations = newBench.classLocations,
-        dependenciesLocations = newBench.depsLocations,
-    )
-    newBench.bindMachineOptions(jcConcreteMachineOptions)
     val jcSpringMachineOptions = JcSpringMachineOptions(
         springAnalysisMode = springAnalysisMode
     )
 
     val cp = newBench.cp
-    val nonAbstractClasses = cp.nonAbstractClasses(newBench.classLocations)
+    val nonAbstractClasses = newBench.nonAbstractUserClasses()
     val startClass = nonAbstractClasses.find { it.simpleName == "NewStartSpring" }!!.toType()
     val method = startClass.declaredMethods.find { it.name == "startSpring" }!!
     // using file instead of console
@@ -491,7 +499,7 @@ fun analyzeBench(newBench: BenchCp, springAnalysisMode: JcSpringAnalysisMode, ru
         cp,
         options,
         jcMachineOptions,
-        jcConcreteMachineOptions,
+        newBench.concreteMachineOptions,
         jcSpringMachineOptions,
         testObserver
     )

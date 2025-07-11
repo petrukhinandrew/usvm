@@ -19,7 +19,6 @@ import org.jacodb.api.jvm.cfg.JcClassConstant
 import org.jacodb.api.jvm.cfg.JcNullConstant
 import org.jacodb.api.jvm.cfg.JcReturnInst
 import org.jacodb.api.jvm.cfg.JcVirtualCallExpr
-import org.jacodb.api.jvm.ext.JAVA_OBJECT
 import org.jacodb.api.jvm.ext.findClass
 import org.jacodb.api.jvm.ext.findType
 import org.jacodb.api.jvm.ext.objectType
@@ -65,7 +64,7 @@ object JcRepositoryTransformer : JcClassExtFeature {
     override fun methodsOf(clazz: JcClassOrInterface, originalMethods: List<JcMethod>): List<JcMethod>? {
 
         // Remember to call bindMachineOptions!!!
-        if (!clazz.isJpaRepository || !machineOptions!!.isProjectLocation(clazz)) return null
+        if (!clazz.isJpaRepository || !machineOptions!!.isUserClass(clazz)) return null
 
         val dataClass = clazz.signature!!.genericTypesFromSignature.first().let { clazz.classpath.findClass(it) }
 
