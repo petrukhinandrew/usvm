@@ -1,5 +1,6 @@
 package machine
 
+import java.io.File
 import java.util.jar.JarFile
 import org.jacodb.api.jvm.JcByteCodeLocation
 import org.jacodb.api.jvm.JcClassOrInterface
@@ -31,7 +32,7 @@ data class JcBuildDirsConcreteMachineOptionsImpl(
 }
 
 class JcJarConcreteMachineOptions(
-    jarPath: String,
+    jarFile: File,
     val extraUserClasses: Set<String> = emptySet()
 ): JcConcreteMachineOptions {
     override fun userClassesIn(cp: JcClasspath): Sequence<JcClassOrInterface> {
@@ -48,6 +49,7 @@ class JcJarConcreteMachineOptions(
     }
 
     init {
+        val jarPath = jarFile.absolutePath
         JarFile(jarPath).use { jarFile ->
             val classesPrefix =
                 jarFile.manifest.mainAttributes.getValue(SPRING_BOOT_CLASSES_ATTRIBUTE)

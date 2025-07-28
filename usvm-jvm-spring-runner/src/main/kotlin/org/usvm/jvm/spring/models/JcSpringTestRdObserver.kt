@@ -2,62 +2,53 @@ package org.usvm.jvm.spring.models
 
 import SpringTestReproducer
 import bench.toRenderInfo
+import machine.JcSpringConfigProvider
 import machine.JcSpringTestObserver
 import machine.state.JcSpringState
-import org.jacodb.api.jvm.JcClassOrInterface
-import org.jacodb.api.jvm.JcClasspath
-import org.jacodb.api.jvm.ext.findClass
-import org.usvm.jmv.spring.models.ErrorDescriptor
-import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestClassRenderer
+import org.usvm.jmv.spring.models.AnalysisProcessModel
+import org.usvm.jvm.rendering.JcTestsRenderer
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
+import org.usvm.jvm.spring.runner.toProcError
 import org.usvm.test.api.UTest
-import testGeneration.SpringTestInfo
 import testGeneration.canGenerateTest
 import testGeneration.generateTest
 
 class JcSpringTestRdObserver(
-    private val onNewTest: (String) -> Unit,
-    private val onError: (ErrorDescriptor) -> Unit
+    private val analysisModel: AnalysisProcessModel,
+    private val reproducer: SpringTestReproducer
 ) : JcSpringTestObserver() {
 
-    lateinit var reproducer: Reproducer
+    fun mockOnStateTerminated(uTest: UTest, testInfo: JcSpringMvcTestInfo) {
+//        val reproduced = uTest.reproducesIn(reproducer)
+//        if (!reproduced) return
 
-    fun bindReproducer(instance: Reproducer) {
-        reproducer = instance
-    }
-
-    lateinit var renderer: SingleTestRenderer
-
-    fun bindRenderer(instance: SingleTestRenderer) {
-        renderer = instance
+        val render = JcTestsRenderer().renderSingleTestInClass(
+            JcSpringConfigProvider.getTestClassStub(),
+            Pair(uTest, testInfo)
+        )
+        analysisModel.generatedTests.add(render)
     }
 
     override fun onStateTerminated(state: JcSpringState, stateReachable: Boolean) {
         if (!stateReachable || !state.canGenerateTest()) return
         try {
             val newTest = state.generateTest()
+            val reproduced = newTest.test.reproducesIn(reproducer)
+            if (!reproduced) return
+
             tests.add(newTest)
-            val render = renderer.render(
+
+            val render = JcTestsRenderer().renderSingleTestInClass(
+                JcSpringConfigProvider.getTestClassStub(),
                 newTest.toRenderInfo()
             )
-            onNewTest(render)
+            analysisModel.generatedTests.add(render)
         } catch (e: Throwable) {
-            onError(e.toDescriptor())
+            analysisModel.processSignal.fire(e.toProcError("state processing failed"))
         }
     }
-}
 
-class Reproducer {
-    fun reproduce(uTest: UTest): Boolean {
-        TODO()
-    }
-}
-
-class SingleTestRenderer {
-    fun render(renderInfo: Pair<UTest, JcSpringMvcTestInfo>): String {
-        val (uTest, testInfo) = renderInfo
-        val controller = testInfo.controller
-        val cp = controller.classpath
-        TODO()
+    private fun UTest.reproducesIn(reproducer: SpringTestReproducer): Boolean {
+        return reproducer.reproduce(this) == "success"
     }
 }

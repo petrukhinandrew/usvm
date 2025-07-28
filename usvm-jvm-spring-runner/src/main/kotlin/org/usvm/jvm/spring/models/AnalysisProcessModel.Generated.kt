@@ -16,12 +16,12 @@ import kotlin.jvm.JvmStatic
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:12]
+ * #### Generated from [AnalysisProcessModel.kt:13]
  */
 class AnalysisProcessModel private constructor(
+    private val _prepareDb: RdSignal<PrepareDbRequest>,
     private val _runAnalysis: RdSignal<AnalysisRequest>,
-    private val _newTestGenerated: RdSignal<String>,
-    private val _errorOccured: RdSignal<ErrorDescriptor>,
+    private val _processSignal: RdSignal<ProcNotification>,
     private val _generatedTests: RdList<String>
 ) : RdExtBase() {
     //companion
@@ -29,8 +29,16 @@ class AnalysisProcessModel private constructor(
     companion object : ISerializersOwner {
         
         override fun registerSerializersCore(serializers: ISerializers)  {
+            serializers.register(ClasspathSource.marshaller)
+            serializers.register(PrepareDbRequest)
             serializers.register(AnalysisRequest)
-            serializers.register(ErrorDescriptor)
+            serializers.register(ProcStarted)
+            serializers.register(ProcAnalysisStarted)
+            serializers.register(ProcDbReady)
+            serializers.register(ProcCtxReady)
+            serializers.register(ProcError)
+            serializers.register(ProcAnalysisFinished)
+            serializers.register(ProcNotification_Unknown)
         }
         
         
@@ -51,16 +59,16 @@ class AnalysisProcessModel private constructor(
         }
         
         
-        const val serializationHash = -5914040717084540285L
+        const val serializationHash = 7859071244117393535L
         
     }
     override val serializersOwner: ISerializersOwner get() = AnalysisProcessModel
     override val serializationHash: Long get() = AnalysisProcessModel.serializationHash
     
     //fields
+    val prepareDb: IAsyncSignal<PrepareDbRequest> get() = _prepareDb
     val runAnalysis: IAsyncSignal<AnalysisRequest> get() = _runAnalysis
-    val newTestGenerated: IAsyncSignal<String> get() = _newTestGenerated
-    val errorOccured: IAsyncSignal<ErrorDescriptor> get() = _errorOccured
+    val processSignal: IAsyncSignal<ProcNotification> get() = _processSignal
     val generatedTests: IMutableViewableList<String> get() = _generatedTests
     //methods
     //initializer
@@ -69,25 +77,25 @@ class AnalysisProcessModel private constructor(
     }
     
     init {
+        _prepareDb.async = true
         _runAnalysis.async = true
-        _newTestGenerated.async = true
-        _errorOccured.async = true
+        _processSignal.async = true
         _generatedTests.async = true
     }
     
     init {
+        bindableChildren.add("prepareDb" to _prepareDb)
         bindableChildren.add("runAnalysis" to _runAnalysis)
-        bindableChildren.add("newTestGenerated" to _newTestGenerated)
-        bindableChildren.add("errorOccured" to _errorOccured)
+        bindableChildren.add("processSignal" to _processSignal)
         bindableChildren.add("generatedTests" to _generatedTests)
     }
     
     //secondary constructor
     private constructor(
     ) : this(
+        RdSignal<PrepareDbRequest>(PrepareDbRequest),
         RdSignal<AnalysisRequest>(AnalysisRequest),
-        RdSignal<String>(FrameworkMarshallers.String),
-        RdSignal<ErrorDescriptor>(ErrorDescriptor),
+        RdSignal<ProcNotification>(AbstractPolymorphic(ProcNotification)),
         RdList<String>(FrameworkMarshallers.String)
     )
     
@@ -97,9 +105,9 @@ class AnalysisProcessModel private constructor(
     override fun print(printer: PrettyPrinter)  {
         printer.println("AnalysisProcessModel (")
         printer.indent {
+            print("prepareDb = "); _prepareDb.print(printer); println()
             print("runAnalysis = "); _runAnalysis.print(printer); println()
-            print("newTestGenerated = "); _newTestGenerated.print(printer); println()
-            print("errorOccured = "); _errorOccured.print(printer); println()
+            print("processSignal = "); _processSignal.print(printer); println()
             print("generatedTests = "); _generatedTests.print(printer); println()
         }
         printer.print(")")
@@ -107,9 +115,9 @@ class AnalysisProcessModel private constructor(
     //deepClone
     override fun deepClone(): AnalysisProcessModel   {
         return AnalysisProcessModel(
+            _prepareDb.deepClonePolymorphic(),
             _runAnalysis.deepClonePolymorphic(),
-            _newTestGenerated.deepClonePolymorphic(),
-            _errorOccured.deepClonePolymorphic(),
+            _processSignal.deepClonePolymorphic(),
             _generatedTests.deepClonePolymorphic()
         )
     }
@@ -120,11 +128,9 @@ val IProtocol.analysisProcessModel get() = getOrCreateExtension(AnalysisProcessM
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:13]
+ * #### Generated from [AnalysisProcessModel.kt:25]
  */
 data class AnalysisRequest (
-    val userClassPath: List<String>,
-    val libsClassPath: List<String>,
     val analysisController: String?,
     val analysisHandle: String?,
     val analysisPath: List<String>,
@@ -139,20 +145,16 @@ data class AnalysisRequest (
         
         @Suppress("UNCHECKED_CAST")
         override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): AnalysisRequest  {
-            val userClassPath = buffer.readList { buffer.readString() }
-            val libsClassPath = buffer.readList { buffer.readString() }
             val analysisController = buffer.readNullable { buffer.readString() }
             val analysisHandle = buffer.readNullable { buffer.readString() }
             val analysisPath = buffer.readList { buffer.readString() }
             val analysisBootApp = buffer.readString()
             val testClassName = buffer.readString()
             val testClassPackage = buffer.readString()
-            return AnalysisRequest(userClassPath, libsClassPath, analysisController, analysisHandle, analysisPath, analysisBootApp, testClassName, testClassPackage)
+            return AnalysisRequest(analysisController, analysisHandle, analysisPath, analysisBootApp, testClassName, testClassPackage)
         }
         
         override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: AnalysisRequest)  {
-            buffer.writeList(value.userClassPath) { v -> buffer.writeString(v) }
-            buffer.writeList(value.libsClassPath) { v -> buffer.writeString(v) }
             buffer.writeNullable(value.analysisController) { buffer.writeString(it) }
             buffer.writeNullable(value.analysisHandle) { buffer.writeString(it) }
             buffer.writeList(value.analysisPath) { v -> buffer.writeString(v) }
@@ -174,8 +176,6 @@ data class AnalysisRequest (
         
         other as AnalysisRequest
         
-        if (userClassPath != other.userClassPath) return false
-        if (libsClassPath != other.libsClassPath) return false
         if (analysisController != other.analysisController) return false
         if (analysisHandle != other.analysisHandle) return false
         if (analysisPath != other.analysisPath) return false
@@ -188,8 +188,6 @@ data class AnalysisRequest (
     //hash code trait
     override fun hashCode(): Int  {
         var __r = 0
-        __r = __r*31 + userClassPath.hashCode()
-        __r = __r*31 + libsClassPath.hashCode()
         __r = __r*31 + if (analysisController != null) analysisController.hashCode() else 0
         __r = __r*31 + if (analysisHandle != null) analysisHandle.hashCode() else 0
         __r = __r*31 + analysisPath.hashCode()
@@ -202,8 +200,6 @@ data class AnalysisRequest (
     override fun print(printer: PrettyPrinter)  {
         printer.println("AnalysisRequest (")
         printer.indent {
-            print("userClassPath = "); userClassPath.print(printer); println()
-            print("libsClassPath = "); libsClassPath.print(printer); println()
             print("analysisController = "); analysisController.print(printer); println()
             print("analysisHandle = "); analysisHandle.print(printer); println()
             print("analysisPath = "); analysisPath.print(printer); println()
@@ -219,27 +215,44 @@ data class AnalysisRequest (
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:26]
+ * #### Generated from [AnalysisProcessModel.kt:14]
  */
-data class ErrorDescriptor (
-    val message: String,
-    val stackTrace: String
+enum class ClasspathSource {
+    JAR, 
+    BUILD_DIRS;
+    
+    companion object {
+        val marshaller = FrameworkMarshallers.enum<ClasspathSource>()
+        
+    }
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:19]
+ */
+data class PrepareDbRequest (
+    val classpathSource: ClasspathSource,
+    val userClassPath: List<String>,
+    val libsClassPath: List<String>
 ) : IPrintable {
     //companion
     
-    companion object : IMarshaller<ErrorDescriptor> {
-        override val _type: KClass<ErrorDescriptor> = ErrorDescriptor::class
+    companion object : IMarshaller<PrepareDbRequest> {
+        override val _type: KClass<PrepareDbRequest> = PrepareDbRequest::class
         
         @Suppress("UNCHECKED_CAST")
-        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ErrorDescriptor  {
-            val message = buffer.readString()
-            val stackTrace = buffer.readString()
-            return ErrorDescriptor(message, stackTrace)
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): PrepareDbRequest  {
+            val classpathSource = buffer.readEnum<ClasspathSource>()
+            val userClassPath = buffer.readList { buffer.readString() }
+            val libsClassPath = buffer.readList { buffer.readString() }
+            return PrepareDbRequest(classpathSource, userClassPath, libsClassPath)
         }
         
-        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ErrorDescriptor)  {
-            buffer.writeString(value.message)
-            buffer.writeString(value.stackTrace)
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: PrepareDbRequest)  {
+            buffer.writeEnum(value.classpathSource)
+            buffer.writeList(value.userClassPath) { v -> buffer.writeString(v) }
+            buffer.writeList(value.libsClassPath) { v -> buffer.writeString(v) }
         }
         
         
@@ -253,7 +266,298 @@ data class ErrorDescriptor (
         if (this === other) return true
         if (other == null || other::class != this::class) return false
         
-        other as ErrorDescriptor
+        other as PrepareDbRequest
+        
+        if (classpathSource != other.classpathSource) return false
+        if (userClassPath != other.userClassPath) return false
+        if (libsClassPath != other.libsClassPath) return false
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        __r = __r*31 + classpathSource.hashCode()
+        __r = __r*31 + userClassPath.hashCode()
+        __r = __r*31 + libsClassPath.hashCode()
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("PrepareDbRequest (")
+        printer.indent {
+            print("classpathSource = "); classpathSource.print(printer); println()
+            print("userClassPath = "); userClassPath.print(printer); println()
+            print("libsClassPath = "); libsClassPath.print(printer); println()
+        }
+        printer.print(")")
+    }
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:54]
+ */
+class ProcAnalysisFinished (
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcAnalysisFinished> {
+        override val _type: KClass<ProcAnalysisFinished> = ProcAnalysisFinished::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcAnalysisFinished  {
+            return ProcAnalysisFinished()
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcAnalysisFinished)  {
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcAnalysisFinished
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcAnalysisFinished (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:39]
+ */
+class ProcAnalysisStarted (
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcAnalysisStarted> {
+        override val _type: KClass<ProcAnalysisStarted> = ProcAnalysisStarted::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcAnalysisStarted  {
+            return ProcAnalysisStarted()
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcAnalysisStarted)  {
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcAnalysisStarted
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcAnalysisStarted (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:45]
+ */
+class ProcCtxReady (
+    val elapsedTime: Int
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcCtxReady> {
+        override val _type: KClass<ProcCtxReady> = ProcCtxReady::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcCtxReady  {
+            val elapsedTime = buffer.readInt()
+            return ProcCtxReady(elapsedTime)
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcCtxReady)  {
+            buffer.writeInt(value.elapsedTime)
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcCtxReady
+        
+        if (elapsedTime != other.elapsedTime) return false
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        __r = __r*31 + elapsedTime.hashCode()
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcCtxReady (")
+        printer.indent {
+            print("elapsedTime = "); elapsedTime.print(printer); println()
+        }
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:41]
+ */
+class ProcDbReady (
+    val elapsedTime: Int
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcDbReady> {
+        override val _type: KClass<ProcDbReady> = ProcDbReady::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcDbReady  {
+            val elapsedTime = buffer.readInt()
+            return ProcDbReady(elapsedTime)
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcDbReady)  {
+            buffer.writeInt(value.elapsedTime)
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcDbReady
+        
+        if (elapsedTime != other.elapsedTime) return false
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        __r = __r*31 + elapsedTime.hashCode()
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcDbReady (")
+        printer.indent {
+            print("elapsedTime = "); elapsedTime.print(printer); println()
+        }
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:49]
+ */
+class ProcError (
+    val message: String,
+    val stackTrace: List<String>
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcError> {
+        override val _type: KClass<ProcError> = ProcError::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcError  {
+            val message = buffer.readString()
+            val stackTrace = buffer.readList { buffer.readString() }
+            return ProcError(message, stackTrace)
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcError)  {
+            buffer.writeString(value.message)
+            buffer.writeList(value.stackTrace) { v -> buffer.writeString(v) }
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcError
         
         if (message != other.message) return false
         if (stackTrace != other.stackTrace) return false
@@ -269,13 +573,148 @@ data class ErrorDescriptor (
     }
     //pretty print
     override fun print(printer: PrettyPrinter)  {
-        printer.println("ErrorDescriptor (")
+        printer.println("ProcError (")
         printer.indent {
             print("message = "); message.print(printer); println()
             print("stackTrace = "); stackTrace.print(printer); println()
         }
         printer.print(")")
     }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:35]
+ */
+abstract class ProcNotification (
+) : IPrintable {
+    //companion
+    
+    companion object : IAbstractDeclaration<ProcNotification> {
+        override fun readUnknownInstance(ctx: SerializationCtx, buffer: AbstractBuffer, unknownId: RdId, size: Int): ProcNotification  {
+            val objectStartPosition = buffer.position
+            val unknownBytes = ByteArray(objectStartPosition + size - buffer.position)
+            buffer.readByteArrayRaw(unknownBytes)
+            return ProcNotification_Unknown(unknownId, unknownBytes)
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    //hash code trait
+    //pretty print
+    //deepClone
+    //contexts
+}
+
+
+class ProcNotification_Unknown (
+    override val unknownId: RdId,
+    val unknownBytes: ByteArray
+) : ProcNotification (
+), IUnknownInstance {
+    //companion
+    
+    companion object : IMarshaller<ProcNotification_Unknown> {
+        override val _type: KClass<ProcNotification_Unknown> = ProcNotification_Unknown::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcNotification_Unknown  {
+            throw NotImplementedError("Unknown instances should not be read via serializer")
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcNotification_Unknown)  {
+            buffer.writeByteArrayRaw(value.unknownBytes)
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcNotification_Unknown
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcNotification_Unknown (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:37]
+ */
+class ProcStarted (
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcStarted> {
+        override val _type: KClass<ProcStarted> = ProcStarted::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcStarted  {
+            return ProcStarted()
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcStarted)  {
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcStarted
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcStarted (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
     //deepClone
     //contexts
 }

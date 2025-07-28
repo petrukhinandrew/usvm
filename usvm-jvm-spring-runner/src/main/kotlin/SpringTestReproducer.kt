@@ -21,7 +21,6 @@ class SpringTestReproducer(
     private fun createExecutor(): UTestConcreteExecutor {
         val reproducingLocations = System.getenv("usvm.jvm.springTestDeps.paths").split(";")
         val approximations = System.getenv("usvm.jvm.approximations.jar.path")
-        // TODO: is generated class in cp
         val locations = cp.locations.map { it.path } + reproducingLocations + listOf(approximations)
         val opts = UTestExecutionOptions(execMode = InstrumentedProcess.UTestExecMode.RESULT_ONLY)
         val executor = UTestConcreteExecutor(
@@ -37,13 +36,12 @@ class SpringTestReproducer(
         return executor
     }
 
-    private var executor: UTestConcreteExecutor? = null
+    private val executor: UTestConcreteExecutor by lazy {
+        createExecutor()
+    }
 
     fun reproduce(test: UTest): String {
-        if (executor == null)
-            executor = createExecutor()
-
-        val result = executor!!.executeSync(test)
+        val result = executor.executeSync(test)
         if (result is UTestExecutionFailedResult)
             return result.cause.message
         if (result is UTestExecutionInitFailedResult)
@@ -56,6 +54,6 @@ class SpringTestReproducer(
     }
 
     fun kill() {
-        executor?.close()
+        executor.close()
     }
 }

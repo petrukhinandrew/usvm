@@ -245,9 +245,6 @@ fun openPackageEntry(module: String, pkg: String): String = "$module/$pkg=ALL-UN
 
 fun packageEntry(module: String, pkg: String): String = "$module/$pkg"
 
-val addOpensPool: List<String> = buildAddOpens()
-val addExportsPool: List<String> = buildAddExports()
-
 val springRunnerJar = tasks.register<ShadowJar>("springJar") {
     group = "jar"
     version = "1.2.10"
@@ -269,10 +266,8 @@ val springRunnerJar = tasks.register<ShadowJar>("springJar") {
     }
 
     configurations = listOf(project.configurations.runtimeClasspath.get())
-
     mergeServiceFiles()
     with(tasks.jar.get() as CopySpec)
-    println(this.outputs.files.joinToString(" ") { it.absolutePath })
 }
 
 

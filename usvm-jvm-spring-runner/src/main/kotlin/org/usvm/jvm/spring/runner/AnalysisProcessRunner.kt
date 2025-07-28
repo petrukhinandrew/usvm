@@ -3,6 +3,7 @@ package org.usvm.jvm.spring.runner
 import com.jetbrains.rd.framework.Protocol
 import com.jetbrains.rd.framework.base.RdExtBase
 import com.jetbrains.rd.framework.util.NetUtils
+import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.lifetime.isAlive
 import java.io.File
@@ -14,7 +15,6 @@ import org.usvm.instrumentation.util.InstrumentationModuleConstants
 import org.usvm.instrumentation.util.UTestExecutorInitException
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
-import org.usvm.jmv.spring.models.ErrorDescriptor
 import org.usvm.jmv.spring.models.analysisProcessModel
 
 // TODO: get coroutine context as a parameter?
@@ -34,21 +34,12 @@ class AnalysisRdProcessRunner(
     }
 
     fun startAnalysis(request: AnalysisRequest) {
-        println("FIIIIIIRRRRREEEEE")
         model.runAnalysis.fire(request)
-    }
-
-    fun bindOnNewTest(callback: (String) -> Unit) {
-        model.newTestGenerated.advise(lifetime, callback)
-    }
-
-    fun bindOnError(callback: (ErrorDescriptor) -> Unit) {
-        model.errorOccured.advise(lifetime, callback)
     }
 }
 
 @Suppress("unused")
-class AnalysisProcessRunner: AutoCloseable {
+class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
 
     companion object {
         private const val localAgentPath =
@@ -59,7 +50,7 @@ class AnalysisProcessRunner: AutoCloseable {
 
     lateinit var rdProcessRunner: AnalysisRdProcessRunner
 
-    val lifetime = LifetimeDefinition()
+    val lifetime = parentLifetime.createNested()
 
     val model: AnalysisProcessModel get() = rdProcessRunner.model
 
@@ -67,7 +58,7 @@ class AnalysisProcessRunner: AutoCloseable {
         lifetime.terminate()
     }
 
-    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean, onNewTest: (String) -> Unit, onError: (ErrorDescriptor) -> Unit): Process {
+    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean): Process {
         val port = NetUtils.findFreePort(0)
         val process = runJar(
             javaPath,
@@ -77,9 +68,6 @@ class AnalysisProcessRunner: AutoCloseable {
         rdProcessRunner =
             AnalysisRdProcessRunner(process = process, checkProcessAliveDelay = 1.seconds, rdPort = port, lifetimeDefinition = lifetime)
         rdProcessRunner.init()
-        rdProcessRunner.bindOnError(onError)
-        rdProcessRunner.bindOnNewTest(onNewTest)
-
         return process
     }
 
@@ -236,6 +224,11 @@ class AnalysisProcessRunner: AutoCloseable {
     fun exportPackageEntry(module: String, pkg: String): List<String> =
         listOf("--add-exports", "$module/$pkg=ALL-UNNAMED")
 
+    private fun webExplorationPolicyPath(): String {
+        return this::class.java.classLoader.getResource("webExplorationPolicy.policy")?.path
+            ?: error("no webExplorationPolicy found in jar")
+    }
+
     private fun buildJvmArgs(
         mainClazz: String,
         agentPath: String = localAgentPath,
@@ -245,7 +238,7 @@ class AnalysisProcessRunner: AutoCloseable {
         return listOf(
             "-Xmx12g",
             "-Djava.security.manager",
-            "-Djava.security.policy=/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-spring-runner/webExplorationPolicy.policy",
+            "-Djava.security.policy=${webExplorationPolicyPath()}",
             "-Djdk.util.jar.enableMultiRelease=false",
             "-Djdk.util.jar.enableMultiRelease=false",
             "-javaagent:$agentPath",
@@ -258,7 +251,7 @@ class AnalysisProcessRunner: AutoCloseable {
                         "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:${NetUtils.findFreePort(0)}"
                     )
                 else
-                    emptyList<String>()) +
+                    emptyList()) +
                             addOpens +
                             addExports +
                             mainClazz
@@ -292,7 +285,6 @@ class AnalysisProcessRunner: AutoCloseable {
         } catch (e: Exception) {
             println("DBG fail ${e.message}")
         }
-        println("DBG exiting runJar")
         return null
     }
 

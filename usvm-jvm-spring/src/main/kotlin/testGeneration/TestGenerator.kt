@@ -48,7 +48,7 @@ fun JcSpringState.canGenerateTest(): Boolean {
 
 data class SpringTestInfo(
     val stateId: UInt,
-    val method: JcMethod,
+    val handler: JcMethod,
     val isExceptional: Boolean,
     val test: UTest,
 )

@@ -38,6 +38,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import org.usvm.api.createUTest
 import org.usvm.jvm.rendering.JcTestsRenderer
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
 import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeTestInfo
 
 @ExtendWith(UTestRunnerController::class)
@@ -829,10 +830,14 @@ open class JavaMethodTestRunner : TestRunner<JcTest, KFunction<*>, KClass<*>?, J
         val renderer = JcTestsRenderer()
         createMachine(cp, options, interpreterObserver).use { machine ->
             val states = machine.analyze(jcMethod.method, targets)
-            states.map { createUTest(jcMethod, it).let { test -> test to JcUnsafeTestInfo(jcMethod.method, false) } }.let { t -> renderer.renderTests(cp, t, false) }.forEach { t, u ->  println(u); println() }
+            val testInfo = states.map {
+                createUTest(jcMethod, it) to JcUnsafeTestInfo(jcMethod.method, false)
+            }
+            val render = renderer.renderTests(cp, testInfo, ReflectionUtilsInlineStrategy.NestedClass)
+            render.forEach { t, u ->  println(u); println() }
+
             states.map { testResolver.resolve(jcMethod, it) }
         }
-
     }
 
     override val coverageRunner: (List<JcTest>) -> JcClassCoverage = { _ ->

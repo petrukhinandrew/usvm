@@ -9,11 +9,20 @@ import com.jetbrains.rd.generator.nova.list
 import com.jetbrains.rd.generator.nova.nullable
 import com.jetbrains.rd.generator.nova.signal
 
+@Suppress("unused")
 object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
-    val analysisRequest = structdef {
+    val classpathSource = enum {
+        +"JAR"
+        + "BUILD_DIRS"
+    }
+
+    val prepareDbRequest = structdef {
+        field("classpathSource", classpathSource)
         field("userClassPath", immutableList(PredefinedType.string))
         field("libsClassPath", immutableList(PredefinedType.string))
+    }
 
+    val analysisRequest = structdef {
         field("analysisController", PredefinedType.string.nullable)
         field("analysisHandle", PredefinedType.string.nullable)
         field("analysisPath", immutableList(PredefinedType.string))
@@ -23,15 +32,36 @@ object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
         field("testClassPackage", PredefinedType.string)
     }
 
-    val errorDescriptor = structdef {
-        field("message", PredefinedType.string)
-        field("stackTrace", PredefinedType.string)
+    val procNotification = basestruct { }
+
+    val procStarted = structdef extends procNotification { }
+
+    val procAnalysisStarted = structdef extends procNotification { }
+
+    val procDbReady = structdef extends procNotification {
+        field("elapsedTime", PredefinedType.int)
     }
 
+    val procCpReady = structdef extends procNotification { }
+
+    val procCtxReady = structdef extends procNotification {
+        field("elapsedTime", PredefinedType.long)
+    }
+
+    val procError = structdef extends procNotification {
+        field("message", PredefinedType.string)
+        field("stackTrace", immutableList(PredefinedType.string))
+    }
+
+    val procAnalysisFinished = structdef extends procNotification { }
+
     init {
+        signal("prepareDb", prepareDbRequest).async
+
         signal("runAnalysis", analysisRequest).async
-        signal("newTestGenerated", PredefinedType.string).async
-        signal("errorOccured", errorDescriptor).async
+
+        signal("processSignal", procNotification).async
+
         list("generatedTests", PredefinedType.string).async
     }
 }

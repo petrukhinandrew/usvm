@@ -601,7 +601,7 @@ class JcSpringMethodApproximationResolver (
 
     @Suppress("UNUSED_PARAMETER")
     private fun shouldAnalyzePath(path: String, handlerName: String, controllerTypeName: String): Boolean {
-        return JcSpringConfigProvider.shoudlAnalyze(path, controllerTypeName, handlerName)
+        return JcSpringConfigProvider.shouldAnalyze(path, controllerTypeName, handlerName)
     }
 
     private fun shouldSkipController(controllerType: JcClassOrInterface): Boolean {
