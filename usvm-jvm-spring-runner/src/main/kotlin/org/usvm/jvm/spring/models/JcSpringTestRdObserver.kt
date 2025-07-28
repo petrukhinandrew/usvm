@@ -1,14 +1,14 @@
 package org.usvm.jvm.spring.models
 
 import SpringTestReproducer
-import bench.toRenderInfo
 import machine.JcSpringConfigProvider
 import machine.JcSpringTestObserver
 import machine.state.JcSpringState
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jvm.rendering.JcTestsRenderer
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
-import org.usvm.jvm.spring.runner.toProcError
+import org.usvm.jvm.spring.toRenderInfo
+import org.usvm.jvm.spring.utils.toProcError
 import org.usvm.test.api.UTest
 import testGeneration.canGenerateTest
 import testGeneration.generateTest

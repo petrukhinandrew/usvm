@@ -1,8 +1,5 @@
-package bench
-
 import machine.interpreter.transformers.springjpa.APPROX_NAME
 import machine.interpreter.transformers.springjpa.DATABASES
-import machine.interpreter.transformers.springjpa.JAVA_BOOL
 import machine.interpreter.transformers.springjpa.JAVA_CLASS
 import machine.interpreter.transformers.springjpa.JAVA_INIT
 import machine.interpreter.transformers.springjpa.JAVA_STRING

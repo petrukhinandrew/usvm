@@ -1,10 +1,6 @@
 package org.usvm.jvm.spring.runner
 
 import SpringTestReproducer
-import bench.BenchCp
-import bench.generateTestClass
-import bench.loadBenchCpFromBuildDirs
-import bench.loadBenchCpFromJar
 import com.jetbrains.rd.framework.IdKind
 import com.jetbrains.rd.framework.Identities
 import com.jetbrains.rd.framework.Protocol
@@ -14,18 +10,13 @@ import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.threading.SingleThreadScheduler
 import java.io.File
-import kotlin.system.measureNanoTime
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.DurationUnit
-import kotlin.time.measureTime
 import kotlin.time.toDuration
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import machine.JcSpringAnalysisMode
 import machine.JcSpringConfigProvider
-import mu.KLogging
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Options
 import org.jacodb.api.jvm.JcClasspath
@@ -38,18 +29,24 @@ import org.usvm.instrumentation.rd.pumpAsync
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
 import org.usvm.jmv.spring.models.ClasspathSource
-import org.usvm.jmv.spring.models.PrepareDbRequest
+import org.usvm.jmv.spring.models.ProcCpReady
 import org.usvm.jmv.spring.models.ProcDbReady
-import org.usvm.jmv.spring.models.ProcError
 import org.usvm.jmv.spring.models.analysisProcessModel
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
+import org.usvm.jvm.spring.BenchCp
+import org.usvm.jvm.spring.generator.generateTestClass
+import org.usvm.jvm.spring.loader.concreteApiFile
+import org.usvm.jvm.spring.loader.loadBenchClasspath
+import org.usvm.jvm.spring.loader.loadBenchDatabase
 import org.usvm.jvm.spring.models.JcSpringTestRdObserver
+import org.usvm.jvm.spring.utils.ResultWithTime
+import org.usvm.jvm.spring.utils.awaitTermination
+import org.usvm.jvm.spring.utils.terminateOnException
+import org.usvm.jvm.spring.utils.toProcError
 import org.usvm.jvm.util.stringType
 import org.usvm.test.api.UTest
 import org.usvm.test.api.UTestStringExpression
 import org.usvm.test.api.spring.SpringTestExecBuilder
-
-val logger = object : KLogging() {}.logger
 
 class AnalysisProcess private constructor() {
     companion object {
@@ -73,16 +70,15 @@ class AnalysisProcess private constructor() {
 
         val cmd = DefaultParser().parse(opts, args)
         val timeout = cmd.getOptionValue("t")
-            .toIntOrNull()?.toDuration(DurationUnit.SECONDS)
-            ?: 120.toDuration(DurationUnit.SECONDS)
+            .toIntOrNull()?.toDuration(DurationUnit.SECONDS) ?: 120.toDuration(DurationUnit.SECONDS)
         val port = cmd.getOptionValue("p")
             .toIntOrNull() ?: error("Specify rd port number")
 
         val def = LifetimeDefinition()
 
-        RdUtils.terminateOnException(def) {
+        terminateOnException(def) {
             initiate(def, port, timeout)
-            RdUtils.awaitTermination(def)
+            awaitTermination(def)
         }
     }
 
@@ -119,16 +115,34 @@ class AnalysisProcess private constructor() {
 
     private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime) {
         prepareDb.advise(lifetime) { request ->
-            cpSource = request.classpathSource
-            val benchResult = prepareBenchCp(request)
+            val userClasses = request.userClassPath.map { File(it) }
+            val libsClasses = request.libsClassPath.map { File(it) }
+
+            val benchResult = ResultWithTime.calculate {
+                loadBenchDatabase(
+                    request.classpathSource,
+                    userClasses,
+                    libsClasses
+                )
+            }.chain { db ->
+                loadBenchClasspath(
+                    db,
+                    request.classpathSource,
+                    userClasses + libsClasses + concreteApiFile(),
+                    userClasses,
+                    libsClasses
+                )
+            }
+
             when {
                 benchResult.error != null -> {
                     processSignal.fire(benchResult.error.toProcError("db load error"))
                 }
 
                 else -> {
+                    cpSource = request.classpathSource
                     rawBenchCp = benchResult.result!!
-                    processSignal.fire(ProcDbReady(benchResult.timeSpent.inWholeSeconds.toInt()))
+                    processSignal.fire(ProcDbReady(benchResult.elapsedTime.inWholeSeconds.toInt()))
                 }
             }
         }
@@ -139,24 +153,26 @@ class AnalysisProcess private constructor() {
             }
             bindRequest(request)
             val analysisMode = JcSpringAnalysisMode.SpringBootTest
-            val updatedBench = generateTestClass(rawBenchCp, cpSource, analysisMode, request.analysisBootApp)
-            runConcreteAnalysis(request, analysisMode, updatedBench, runnerTimeout)
-        }
-    }
-
-    private fun loadBenchCpFromRequest(request: PrepareDbRequest): ResultWithTime<BenchCp> =
-        ResultWithTime.calculate {
-            when (JcSpringConfigProvider.classpathSource!!) {
-                JcSpringConfigProvider.SpringCpSource.JAR -> loadBenchCpFromJar(
-                    request.userClassPath.first { it.endsWith(".jar") },
-                    request.libsClassPath
+            val updatedBenchResult = ResultWithTime.calculate {
+                generateTestClass(
+                    rawBenchCp,
+                    cpSource,
+                    analysisMode,
+                    request.analysisBootApp
                 )
+            }
+            when {
+                updatedBenchResult.error != null -> {
+                    processSignal.fire(updatedBenchResult.error.toProcError("cp preparation error"))
+                }
 
-                JcSpringConfigProvider.SpringCpSource.BUILD_DIRS -> loadBenchCpFromBuildDirs(
-                    request.userClassPath.map { File(it) },
-                    request.libsClassPath.map { File(it) })
+                else -> {
+                    processSignal.fire(ProcCpReady())
+                    runConcreteAnalysis(request, analysisMode, updatedBenchResult.result!!, runnerTimeout)
+                }
             }
         }
+    }
 
     private fun runConcreteAnalysis(request: AnalysisRequest, analysisMode: JcSpringAnalysisMode, updatedBench: BenchCp, runnerTimeout: Duration) {
         val reproducer = SpringTestReproducer(updatedBench.concreteMachineOptions, updatedBench.cp)
@@ -207,68 +223,7 @@ class AnalysisProcess private constructor() {
         JcSpringConfigProvider.analyzeBootApp(request.analysisBootApp)
     }
 
-    private fun prepareBenchCp(request: PrepareDbRequest): ResultWithTime<BenchCp> {
-        JcSpringConfigProvider.bindClasspathSource(
-            when (request.classpathSource) {
-                ClasspathSource.JAR -> JcSpringConfigProvider.SpringCpSource.JAR
-                ClasspathSource.BUILD_DIRS -> JcSpringConfigProvider.SpringCpSource.BUILD_DIRS
-            }
-        )
-        return loadBenchCpFromRequest(request)
-    }
-
     private fun prepareCtx() {
         TODO()
     }
-
-    private fun <T> logTime(message: String, body: () -> T): T {
-        val result: T
-        val time = measureNanoTime {
-            result = body()
-        }
-        logger.info { "Time: $message | ${time.nanoseconds}" }
-        return result
-    }
-}
-
-internal object RdUtils {
-    @Suppress("TooGenericExceptionCaught")
-    inline fun <T> terminateOnException(lifetimeDef: LifetimeDefinition, block: (Lifetime) -> T): T {
-        try {
-            return block(lifetimeDef)
-        } catch (e: Throwable) {
-            lifetimeDef.terminate()
-            println((e.message ?: "") + "terminateOnException thrown")
-            println(e.stackTraceToString())
-            throw e
-        }
-    }
-
-    suspend fun awaitTermination(lifetime: Lifetime) {
-        val deferred = CompletableDeferred<Unit>()
-        lifetime.onTermination { deferred.complete(Unit) }
-        deferred.await()
-    }
-
-}
-
-internal data class ResultWithTime<T>(val result: T?, val timeSpent: Duration, val error: Throwable?) {
-    companion object {
-        fun <T> calculate(block: () -> T): ResultWithTime<T> {
-            var res: T? = null
-            var err: Throwable? = null
-            val elapsed = measureTime {
-                try {
-                    res = block()
-                } catch (e: Throwable) {
-                    err = e
-                }
-            }
-            return ResultWithTime(res, elapsed, err)
-        }
-    }
-}
-
-internal fun Throwable.toProcError(msg: String): ProcError {
-    return ProcError(message ?: msg, stackTrace.map { it.toString() })
 }

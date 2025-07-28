@@ -35,6 +35,7 @@ class AnalysisProcessModel private constructor(
             serializers.register(ProcStarted)
             serializers.register(ProcAnalysisStarted)
             serializers.register(ProcDbReady)
+            serializers.register(ProcCpReady)
             serializers.register(ProcCtxReady)
             serializers.register(ProcError)
             serializers.register(ProcAnalysisFinished)
@@ -59,7 +60,7 @@ class AnalysisProcessModel private constructor(
         }
         
         
-        const val serializationHash = 7859071244117393535L
+        const val serializationHash = -8980821831842246614L
         
     }
     override val serializersOwner: ISerializersOwner get() = AnalysisProcessModel
@@ -298,7 +299,7 @@ data class PrepareDbRequest (
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:54]
+ * #### Generated from [AnalysisProcessModel.kt:56]
  */
 class ProcAnalysisFinished (
 ) : ProcNotification (
@@ -404,8 +405,60 @@ class ProcAnalysisStarted (
 /**
  * #### Generated from [AnalysisProcessModel.kt:45]
  */
+class ProcCpReady (
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcCpReady> {
+        override val _type: KClass<ProcCpReady> = ProcCpReady::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcCpReady  {
+            return ProcCpReady()
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcCpReady)  {
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcCpReady
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcCpReady (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:47]
+ */
 class ProcCtxReady (
-    val elapsedTime: Int
+    val elapsedTime: Long
 ) : ProcNotification (
 ) {
     //companion
@@ -415,12 +468,12 @@ class ProcCtxReady (
         
         @Suppress("UNCHECKED_CAST")
         override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcCtxReady  {
-            val elapsedTime = buffer.readInt()
+            val elapsedTime = buffer.readLong()
             return ProcCtxReady(elapsedTime)
         }
         
         override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcCtxReady)  {
-            buffer.writeInt(value.elapsedTime)
+            buffer.writeLong(value.elapsedTime)
         }
         
         
@@ -522,7 +575,7 @@ class ProcDbReady (
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:49]
+ * #### Generated from [AnalysisProcessModel.kt:51]
  */
 class ProcError (
     val message: String,
