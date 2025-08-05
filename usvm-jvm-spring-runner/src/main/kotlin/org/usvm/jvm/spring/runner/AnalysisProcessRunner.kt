@@ -3,11 +3,12 @@ package org.usvm.jvm.spring.runner
 import com.jetbrains.rd.framework.Protocol
 import com.jetbrains.rd.framework.base.RdExtBase
 import com.jetbrains.rd.framework.util.NetUtils
-import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.lifetime.isAlive
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.absolutePathString
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import org.usvm.instrumentation.executor.RdProcessRunnerBase
@@ -17,7 +18,6 @@ import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
 import org.usvm.jmv.spring.models.analysisProcessModel
 
-// TODO: get coroutine context as a parameter?
 class AnalysisRdProcessRunner(
     process: Process,
     checkProcessAliveDelay: Duration,
@@ -39,18 +39,18 @@ class AnalysisRdProcessRunner(
 }
 
 @Suppress("unused")
-class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
+class AnalysisProcessRunner(val lifetime: LifetimeDefinition): AutoCloseable {
 
     companion object {
         private const val localAgentPath =
             "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-concrete/agent/build/libs/agent.jar"
         private const val localRunnerPath =
             "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-spring-runner/build/libs/usvm-jvm-spring-runner-1.2.10.jar"
+
+        private const val analysisProcessMainClass = "org.usvm.jvm.spring.runner.AnalysisProcess"
     }
 
     lateinit var rdProcessRunner: AnalysisRdProcessRunner
-
-    val lifetime = parentLifetime.createNested()
 
     val model: AnalysisProcessModel get() = rdProcessRunner.model
 
@@ -63,7 +63,10 @@ class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
         val process = runJar(
             javaPath,
             localRunnerPath,
-            buildJvmArgs("org.usvm.jvm.spring.runner.AnalysisProcess", allowDebugging = allowDebugging) + listOf("-t", timeoutSeconds.toString(), "-p", port.toString())
+            buildJvmArgs(
+                analysisProcessMainClass,
+                allowDebugging = allowDebugging
+            ) + listOf("-t", timeoutSeconds.toString(), "-p", port.toString())
         ) ?: error("cannot run jar")
         rdProcessRunner =
             AnalysisRdProcessRunner(process = process, checkProcessAliveDelay = 1.seconds, rdPort = port, lifetimeDefinition = lifetime)
@@ -99,8 +102,19 @@ class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
 
     private val localSpringDir get() = workingDir.resolve("spring").createOrClear()
 
+    private val tempPolicyPath: Path
+
     init {
         workingDir.deleteOnExit()
+
+        val tempPolicyContent = """
+            grant {
+                permission java.security.AllPermission "", "";
+            };
+        """.trimIndent()
+        val policyPath = Files.createTempFile(workingDir.toPath(), "webExplorationPolicy", ".policy")
+        tempPolicyPath = Files.write(policyPath, tempPolicyContent.encodeToByteArray())
+        tempPolicyPath.toFile().deleteOnExit()
     }
 
     private val addOpens: List<String> get() {
@@ -224,11 +238,6 @@ class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
     fun exportPackageEntry(module: String, pkg: String): List<String> =
         listOf("--add-exports", "$module/$pkg=ALL-UNNAMED")
 
-    private fun webExplorationPolicyPath(): String {
-        return this::class.java.classLoader.getResource("webExplorationPolicy.policy")?.path
-            ?: error("no webExplorationPolicy found in jar")
-    }
-
     private fun buildJvmArgs(
         mainClazz: String,
         agentPath: String = localAgentPath,
@@ -238,7 +247,7 @@ class AnalysisProcessRunner(parentLifetime: Lifetime): AutoCloseable {
         return listOf(
             "-Xmx12g",
             "-Djava.security.manager",
-            "-Djava.security.policy=${webExplorationPolicyPath()}",
+            "-Djava.security.policy=${tempPolicyPath.absolutePathString()}",
             "-Djdk.util.jar.enableMultiRelease=false",
             "-Djdk.util.jar.enableMultiRelease=false",
             "-javaagent:$agentPath",

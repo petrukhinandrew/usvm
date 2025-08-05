@@ -3,7 +3,7 @@ package org.usvm.jvm.spring.generator
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import machine.JcSpringAnalysisMode
-import machine.JcSpringConfigProvider
+import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.cfg.JcRawClassConstant
 import org.jacodb.api.jvm.cfg.JcRawReturnInst
 import org.jacodb.api.jvm.ext.findClass
@@ -28,7 +28,7 @@ import org.usvm.test.api.spring.SpringBootTest
 
 
 @Suppress("SameParameterValue")
-fun generateTestClass(benchmark: BenchCp, cpSource: ClasspathSource, springAnalysisMode: JcSpringAnalysisMode, springBootApp: String?): BenchCp {
+fun generateTestClass(benchmark: BenchCp, cpSource: ClasspathSource, springAnalysisMode: JcSpringAnalysisMode, springBootApp: String?): Pair<BenchCp, JcClassOrInterface> {
     val cp = benchmark.cp
 
     val springDirFile = File(System.getenv("springDir"))
@@ -135,6 +135,5 @@ fun generateTestClass(benchmark: BenchCp, cpSource: ClasspathSource, springAnaly
         )
     }
 
-    JcSpringConfigProvider.bindTestClassStub(updatedBench.cp.findClass(newTestClassName))
-    return updatedBench
+    return updatedBench to updatedBench.cp.findClass(newTestClassName)
 }

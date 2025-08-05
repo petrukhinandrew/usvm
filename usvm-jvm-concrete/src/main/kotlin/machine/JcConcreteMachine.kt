@@ -64,8 +64,10 @@ open class JcConcreteMachine(
             concretePs = ps
             wrappingPathSelector(ps)
         }
-        check(concretePs != null)
-        concretePs!!.setAddStateAction { state ->
+        check(concretePs != null) {
+            "concrete memory path selector not set"
+        }
+        concretePs.setAddStateAction { state ->
             resultPs.add(listOf(state))
         }
         return resultPs

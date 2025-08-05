@@ -69,12 +69,12 @@ open class JcConcreteInterpreter(
 
     private fun tryConcreteInvoke(
         scope: JcStepScope,
-        stmt: JcMethodCall,
+        stmt: JcConcreteMethodCallInst,
         exprResolver: JcExprResolver
     ): Boolean {
         return scope.calcOnState {
             val memory = memory as JcConcreteMemory
-            memory.tryConcreteInvoke(stmt, this, exprResolver, jcConcreteMachineOptions)
+            memory.tryConcreteInvoke(stmt, scope, exprResolver, jcConcreteMachineOptions, observer)
         }
     }
 

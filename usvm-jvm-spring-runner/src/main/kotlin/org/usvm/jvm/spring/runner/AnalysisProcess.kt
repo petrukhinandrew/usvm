@@ -16,9 +16,14 @@ import kotlin.time.toDuration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import machine.JcSpringAnalysisMode
-import machine.JcSpringConfigProvider
+import machine.JcSpringAnalysisSessionConfig
+import machine.JcSpringControllerAnalysisConfig
+import machine.JcSpringHandlerAnalysisConfig
+import machine.JcSpringMachineOptions
+import machine.JcSpringPathAnalysisConfig
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Options
+import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcClasspath
 import org.jacodb.api.jvm.ext.findClass
 import org.usvm.instrumentation.generated.models.syncProtocolModel
@@ -31,6 +36,8 @@ import org.usvm.jmv.spring.models.AnalysisRequest
 import org.usvm.jmv.spring.models.ClasspathSource
 import org.usvm.jmv.spring.models.ProcCpReady
 import org.usvm.jmv.spring.models.ProcDbReady
+import org.usvm.jmv.spring.models.ProcError
+import org.usvm.jmv.spring.models.ProcStarted
 import org.usvm.jmv.spring.models.analysisProcessModel
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
 import org.usvm.jvm.spring.BenchCp
@@ -100,17 +107,16 @@ class AnalysisProcess private constructor() {
 
         analysisModel.setup(timeout, lifetime)
 
-        protocol.syncProtocolModel.synchronizationSignal.let { sync ->
-            val answerFromMainProcess = sync.adviseForConditionAsync(lifetime) {
-                if (it == MAIN_PROCESS_NAME) {
-                        sync.fire(CHILD_PROCESS_NAME)
-                    true
-                } else {
-                    false
-                }
+        val syncSignal = protocol.syncProtocolModel.synchronizationSignal
+        val answerFromMainProcess = syncSignal.adviseForConditionAsync(lifetime) {
+            if (it == MAIN_PROCESS_NAME) {
+                syncSignal.fire(CHILD_PROCESS_NAME)
+                true
+            } else {
+                false
             }
-            answerFromMainProcess.await()
         }
+        answerFromMainProcess.await()
     }
 
     private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime) {
@@ -151,7 +157,7 @@ class AnalysisProcess private constructor() {
             check(this@AnalysisProcess::cpSource.isInitialized && this@AnalysisProcess::rawBenchCp.isInitialized) {
                 "cp is not initialized"
             }
-            bindRequest(request)
+
             val analysisMode = JcSpringAnalysisMode.SpringBootTest
             val updatedBenchResult = ResultWithTime.calculate {
                 generateTestClass(
@@ -163,23 +169,34 @@ class AnalysisProcess private constructor() {
             }
             when {
                 updatedBenchResult.error != null -> {
+                    println("${updatedBenchResult.error} occured")
                     processSignal.fire(updatedBenchResult.error.toProcError("cp preparation error"))
                 }
 
                 else -> {
                     processSignal.fire(ProcCpReady())
-                    runConcreteAnalysis(request, analysisMode, updatedBenchResult.result!!, runnerTimeout)
+                    val (bench, testClass) = updatedBenchResult.result!!
+                    val springMachineOptions = JcSpringMachineOptions(
+                        analysisMode,
+                        request.toSessionConfig(testClass)
+                    )
+                    runConcreteAnalysis(springMachineOptions, bench, runnerTimeout)
                 }
             }
         }
+
+        serverReady.advise(lifetime) {
+            processSignal.fire(ProcStarted())
+        }
     }
 
-    private fun runConcreteAnalysis(request: AnalysisRequest, analysisMode: JcSpringAnalysisMode, updatedBench: BenchCp, runnerTimeout: Duration) {
+    private fun runConcreteAnalysis(springOptions: JcSpringMachineOptions, updatedBench: BenchCp, runnerTimeout: Duration) {
         val reproducer = SpringTestReproducer(updatedBench.concreteMachineOptions, updatedBench.cp)
-        val observer = JcSpringTestRdObserver(analysisModel, reproducer)
+
+        val observer = JcSpringTestRdObserver(springOptions, analysisModel, reproducer)
 
         updatedBench.use { bench ->
-            analyzeBenchMock(bench.cp, request, observer)
+            analyzeBenchMock(bench.cp, observer)
 //            analyzeBench(
 //                bench,
 //                analysisMode,
@@ -190,10 +207,7 @@ class AnalysisProcess private constructor() {
         }
     }
 
-    private fun analyzeBenchMock(cp: JcClasspath, request: AnalysisRequest, observer: JcSpringTestRdObserver) {
-        check(request.analysisPath.contains("/resources")) {
-            "mock is designed for getFoos(...) method"
-        }
+    private fun analyzeBenchMock(cp: JcClasspath, observer: JcSpringTestRdObserver) {
         val gtcName = System.getProperty("generatedTestClass")
         val gtc = cp.findClass(gtcName)
         val ctl = cp.findClass("io.aiven.klaw.controller.ResourceClientController")
@@ -201,6 +215,7 @@ class AnalysisProcess private constructor() {
         try {
             val builder = SpringTestExecBuilder.initTestCtx(cp, gtc).addPerformCall(UTestStringExpression("/resources", cp.stringType))
             repeat(10) {
+                if (it == 5) throw IllegalStateException()
                 val uTest = UTest(
                     builder.getInitDSL(),
                     builder.getExecDSL()
@@ -211,19 +226,15 @@ class AnalysisProcess private constructor() {
             }
         }
         catch (e: Throwable) {
-            println("ti pidor ${e.message ?: "irl"}\n ${e.stackTraceToString()}")
+            analysisModel.processSignal.fire(e.toProcError("irl pider"))
         }
     }
 
-    private fun bindRequest(request: AnalysisRequest) {
-        JcSpringConfigProvider.reset()
-        request.analysisController?.let { JcSpringConfigProvider.analyzeController(it) }
-        request.analysisHandle?.let { JcSpringConfigProvider.analyzeHandler(it) }
-        request.analysisPath.forEach { JcSpringConfigProvider.addAnalyzePath(it) }
-        JcSpringConfigProvider.analyzeBootApp(request.analysisBootApp)
-    }
-
-    private fun prepareCtx() {
-        TODO()
-    }
+    private fun AnalysisRequest.toSessionConfig(testClass: JcClassOrInterface): JcSpringAnalysisSessionConfig =
+        when {
+            analysisController != null -> JcSpringControllerAnalysisConfig(analysisController, testClass)
+            analysisHandle != null -> JcSpringHandlerAnalysisConfig(analysisHandle, testClass)
+            analysisPath.isNotEmpty() -> JcSpringPathAnalysisConfig(analysisPath.toSet(), testClass)
+            else -> error("bad analysis request provided")
+        }
 }

@@ -21,7 +21,9 @@ import kotlin.jvm.JvmStatic
 class AnalysisProcessModel private constructor(
     private val _prepareDb: RdSignal<PrepareDbRequest>,
     private val _runAnalysis: RdSignal<AnalysisRequest>,
+    private val _stopAnalysis: RdSignal<Unit>,
     private val _processSignal: RdSignal<ProcNotification>,
+    private val _serverReady: RdSignal<Unit>,
     private val _generatedTests: RdList<String>
 ) : RdExtBase() {
     //companion
@@ -60,7 +62,7 @@ class AnalysisProcessModel private constructor(
         }
         
         
-        const val serializationHash = -8980821831842246614L
+        const val serializationHash = 3658648698745594590L
         
     }
     override val serializersOwner: ISerializersOwner get() = AnalysisProcessModel
@@ -69,7 +71,9 @@ class AnalysisProcessModel private constructor(
     //fields
     val prepareDb: IAsyncSignal<PrepareDbRequest> get() = _prepareDb
     val runAnalysis: IAsyncSignal<AnalysisRequest> get() = _runAnalysis
+    val stopAnalysis: IAsyncSignal<Unit> get() = _stopAnalysis
     val processSignal: IAsyncSignal<ProcNotification> get() = _processSignal
+    val serverReady: IAsyncSignal<Unit> get() = _serverReady
     val generatedTests: IMutableViewableList<String> get() = _generatedTests
     //methods
     //initializer
@@ -80,14 +84,18 @@ class AnalysisProcessModel private constructor(
     init {
         _prepareDb.async = true
         _runAnalysis.async = true
+        _stopAnalysis.async = true
         _processSignal.async = true
+        _serverReady.async = true
         _generatedTests.async = true
     }
     
     init {
         bindableChildren.add("prepareDb" to _prepareDb)
         bindableChildren.add("runAnalysis" to _runAnalysis)
+        bindableChildren.add("stopAnalysis" to _stopAnalysis)
         bindableChildren.add("processSignal" to _processSignal)
+        bindableChildren.add("serverReady" to _serverReady)
         bindableChildren.add("generatedTests" to _generatedTests)
     }
     
@@ -96,7 +104,9 @@ class AnalysisProcessModel private constructor(
     ) : this(
         RdSignal<PrepareDbRequest>(PrepareDbRequest),
         RdSignal<AnalysisRequest>(AnalysisRequest),
+        RdSignal<Unit>(FrameworkMarshallers.Void),
         RdSignal<ProcNotification>(AbstractPolymorphic(ProcNotification)),
+        RdSignal<Unit>(FrameworkMarshallers.Void),
         RdList<String>(FrameworkMarshallers.String)
     )
     
@@ -108,7 +118,9 @@ class AnalysisProcessModel private constructor(
         printer.indent {
             print("prepareDb = "); _prepareDb.print(printer); println()
             print("runAnalysis = "); _runAnalysis.print(printer); println()
+            print("stopAnalysis = "); _stopAnalysis.print(printer); println()
             print("processSignal = "); _processSignal.print(printer); println()
+            print("serverReady = "); _serverReady.print(printer); println()
             print("generatedTests = "); _generatedTests.print(printer); println()
         }
         printer.print(")")
@@ -118,7 +130,9 @@ class AnalysisProcessModel private constructor(
         return AnalysisProcessModel(
             _prepareDb.deepClonePolymorphic(),
             _runAnalysis.deepClonePolymorphic(),
+            _stopAnalysis.deepClonePolymorphic(),
             _processSignal.deepClonePolymorphic(),
+            _serverReady.deepClonePolymorphic(),
             _generatedTests.deepClonePolymorphic()
         )
     }

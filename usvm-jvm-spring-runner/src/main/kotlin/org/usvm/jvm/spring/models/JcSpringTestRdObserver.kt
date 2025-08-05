@@ -1,7 +1,7 @@
 package org.usvm.jvm.spring.models
 
 import SpringTestReproducer
-import machine.JcSpringConfigProvider
+import machine.JcSpringMachineOptions
 import machine.JcSpringTestObserver
 import machine.state.JcSpringState
 import org.usvm.jmv.spring.models.AnalysisProcessModel
@@ -14,16 +14,21 @@ import testGeneration.canGenerateTest
 import testGeneration.generateTest
 
 class JcSpringTestRdObserver(
+    private val springMachineOptions: JcSpringMachineOptions,
     private val analysisModel: AnalysisProcessModel,
     private val reproducer: SpringTestReproducer
 ) : JcSpringTestObserver() {
 
     fun mockOnStateTerminated(uTest: UTest, testInfo: JcSpringMvcTestInfo) {
-//        val reproduced = uTest.reproducesIn(reproducer)
-//        if (!reproduced) return
+        val testClass = checkNotNull(springMachineOptions.sessionConfig.testClass) {
+            "test class expected in JcSpringTestObserver"
+        }
+
+        val reproduced = uTest.reproducesIn(reproducer)
+        if (!reproduced) return
 
         val render = JcTestsRenderer().renderSingleTestInClass(
-            JcSpringConfigProvider.getTestClassStub(),
+            testClass,
             Pair(uTest, testInfo)
         )
         analysisModel.generatedTests.add(render)
@@ -32,14 +37,18 @@ class JcSpringTestRdObserver(
     override fun onStateTerminated(state: JcSpringState, stateReachable: Boolean) {
         if (!stateReachable || !state.canGenerateTest()) return
         try {
+            val testClass = checkNotNull(springMachineOptions.sessionConfig.testClass) {
+                "test class required in rd observer"
+            }
             val newTest = state.generateTest()
+
             val reproduced = newTest.test.reproducesIn(reproducer)
             if (!reproduced) return
 
             tests.add(newTest)
 
             val render = JcTestsRenderer().renderSingleTestInClass(
-                JcSpringConfigProvider.getTestClassStub(),
+                testClass,
                 newTest.toRenderInfo()
             )
             analysisModel.generatedTests.add(render)

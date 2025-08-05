@@ -1,65 +1,64 @@
 package machine
 
 import org.jacodb.api.jvm.JcClassOrInterface
+import org.jacodb.api.jvm.ext.hasAnnotation
 
 data class JcSpringMachineOptions(
-    val springAnalysisMode: JcSpringAnalysisMode
+    val springAnalysisMode: JcSpringAnalysisMode,
+    val sessionConfig: JcSpringAnalysisSessionConfig
 )
 
-object JcSpringConfigProvider {
-    enum class SpringCpSource {
-        JAR, BUILD_DIRS
+interface JcSpringAnalysisSessionConfig  {
+    val testClass: JcClassOrInterface?
+
+    companion object {
+        protected const val CONDITIONAL_ON_PROPERTY =
+            "org.springframework.boot.autoconfigure.condition.ConditionalOnProperty"
     }
 
-    var classpathSource: SpringCpSource? = null
-    private set
+    fun pathSubjectsToAnalysis(path: String, handlerName: String, controllerTypeName: String): Boolean
 
-    fun bindClasspathSource(source: SpringCpSource) {
-        classpathSource = source
+    fun controllerForbiddenForAnalysis(controller: JcClassOrInterface): Boolean {
+        // TODO: support conditional controllers and dependent conditional beans
+        return controller.hasAnnotation(CONDITIONAL_ON_PROPERTY)
     }
+}
 
-    private var controllerName: String? = null
-
-    fun analyzeController(name: String) {
-        controllerName = name
+data class JcSpringControllerAnalysisConfig(
+    val controllerName: String,
+    override val testClass: JcClassOrInterface
+): JcSpringAnalysisSessionConfig {
+    override fun pathSubjectsToAnalysis(
+        path: String,
+        handlerName: String,
+        controllerTypeName: String
+    ): Boolean {
+        return controllerTypeName == controllerName
     }
+}
 
-    private var handlerName: String? = null
-
-    fun analyzeHandler(name: String) {
-        handlerName = name
+data class JcSpringHandlerAnalysisConfig(
+    val handler: String,
+    override val testClass: JcClassOrInterface
+) : JcSpringAnalysisSessionConfig {
+    override fun pathSubjectsToAnalysis(
+        path: String,
+        handlerName: String,
+        controllerTypeName: String
+    ): Boolean {
+        return handlerName == handler
     }
+}
 
-    private var paths: MutableSet<String> = mutableSetOf()
-
-    fun addAnalyzePath(value: String) {
-        paths.add(value)
-    }
-
-
-    var bootApp: String? = null
-        private set
-
-    fun analyzeBootApp(qualifiedName: String) {
-        bootApp = qualifiedName
-    }
-
-    private var testClassStub: JcClassOrInterface? = null
-
-    fun getTestClassStub(): JcClassOrInterface = testClassStub!!
-
-    fun bindTestClassStub(clazz: JcClassOrInterface) {
-        testClassStub = clazz
-    }
-
-    fun shouldAnalyze(pathTemplate: String, controller: String, handler: String): Boolean {
-        return pathTemplate in paths || controller == controllerName || handler == handlerName
-    }
-
-    fun reset() {
-        paths = mutableSetOf()
-        controllerName = null
-        handlerName = null
-        bootApp = null
+data class JcSpringPathAnalysisConfig (
+    val paths: Set<String>,
+    override val testClass: JcClassOrInterface
+): JcSpringAnalysisSessionConfig {
+    override fun pathSubjectsToAnalysis(
+        path: String,
+        handlerName: String,
+        controllerTypeName: String
+    ): Boolean {
+        return path in paths
     }
 }

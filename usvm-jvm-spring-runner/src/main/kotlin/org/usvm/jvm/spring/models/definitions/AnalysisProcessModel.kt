@@ -60,7 +60,11 @@ object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
 
         signal("runAnalysis", analysisRequest).async
 
+        signal("stopAnalysis", PredefinedType.void).async
+
         signal("processSignal", procNotification).async
+
+        signal("serverReady", PredefinedType.void).async
 
         list("generatedTests", PredefinedType.string).async
     }

@@ -601,14 +601,11 @@ class JcSpringMethodApproximationResolver (
 
     @Suppress("UNUSED_PARAMETER")
     private fun shouldAnalyzePath(path: String, handlerName: String, controllerTypeName: String): Boolean {
-        return JcSpringConfigProvider.shouldAnalyze(path, controllerTypeName, handlerName)
+        return jcSpringMachineOptions.sessionConfig.pathSubjectsToAnalysis(path, handlerName, controllerTypeName)
     }
 
-    private fun shouldSkipController(controllerType: JcClassOrInterface): Boolean {
-        return controllerType.annotations.any {
-            // TODO: support conditional controllers and dependent conditional beans
-            it.name == "org.springframework.boot.autoconfigure.condition.ConditionalOnProperty"
-        }
+    private fun shouldSkipController(controller: JcClassOrInterface): Boolean {
+        return jcSpringMachineOptions.sessionConfig.controllerForbiddenForAnalysis(controller)
     }
 
     private fun getRequestMappingMethod(annotation: JcAnnotation): String {

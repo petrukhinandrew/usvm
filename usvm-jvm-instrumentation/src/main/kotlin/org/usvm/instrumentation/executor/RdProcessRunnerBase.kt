@@ -34,7 +34,7 @@ open class RdProcessRunnerBase(
     protected val rdPort: Int,
     protected val lifetime: LifetimeDefinition
 ) {
-    protected val scheduler = SingleThreadScheduler(lifetime, "usvm-executor-scheduler")
+    val scheduler = SingleThreadScheduler(lifetime, "usvm-executor-scheduler")
     protected val coroutineScope = UsvmRdCoroutineScope(lifetime, scheduler)
     lateinit var rdProcess: RdServerProcess
 
@@ -79,16 +79,15 @@ open class RdProcessRunnerBase(
             initModels(protocol)
         }.await()
 
+        val syncSignal = protocol.syncProtocolModel.synchronizationSignal
 
-        protocol.syncProtocolModel.synchronizationSignal.let { sync ->
-            val messageFromChild = sync.adviseForConditionAsync(lifetime) {
-                it == CHILD_PROCESS_NAME
-            }
+        val messageFromChild = syncSignal.adviseForConditionAsync(lifetime) {
+            it == CHILD_PROCESS_NAME
+        }
 
-            while (messageFromChild.isActive) {
-                sync.fire(MAIN_PROCESS_NAME)
-                delay(20.milliseconds)
-            }
+        while (messageFromChild.isActive) {
+            syncSignal.fire(MAIN_PROCESS_NAME)
+            delay(20.milliseconds)
         }
 
         return RdServerProcess(process, lifetime, protocol, model)

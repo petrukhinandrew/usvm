@@ -80,15 +80,15 @@ suspend fun loadBenchClasspath(
         JcGeneratedTypesFeature
     )
 
-    if (!isPureClasspath) {
-        val dbFeatures = listOf(
-            JcRepositoryCrudTransformer,
-            JcRepositoryQueryTransformer,
-            JcRepositoryTransformer,
-            JcDataclassTransformer(tablesInfo!!)
-        )
-        features.addAll(dbFeatures)
-    }
+//    if (!isPureClasspath) {
+//        val dbFeatures = listOf(
+//            JcRepositoryCrudTransformer,
+//            JcRepositoryQueryTransformer,
+//            JcRepositoryTransformer,
+//            JcDataclassTransformer(tablesInfo!!)
+//        )
+//        features.addAll(dbFeatures)
+//    }
 
     val cp = db.classpathWithApproximations(allCpFiles, features)
 
