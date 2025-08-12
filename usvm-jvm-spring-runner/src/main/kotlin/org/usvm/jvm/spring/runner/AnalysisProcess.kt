@@ -34,9 +34,9 @@ import org.usvm.instrumentation.rd.pumpAsync
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
 import org.usvm.jmv.spring.models.ClasspathSource
+import org.usvm.jmv.spring.models.PrepareDbRequest
 import org.usvm.jmv.spring.models.ProcCpReady
 import org.usvm.jmv.spring.models.ProcDbReady
-import org.usvm.jmv.spring.models.ProcError
 import org.usvm.jmv.spring.models.ProcStarted
 import org.usvm.jmv.spring.models.analysisProcessModel
 import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
@@ -105,7 +105,7 @@ class AnalysisProcess private constructor() {
             protocol.analysisProcessModel
         }.await()
 
-        analysisModel.setup(timeout, lifetime)
+        analysisModel.setup(timeout, lifetime, true)
 
         val syncSignal = protocol.syncProtocolModel.synchronizationSignal
         val answerFromMainProcess = syncSignal.adviseForConditionAsync(lifetime) {
@@ -119,74 +119,93 @@ class AnalysisProcess private constructor() {
         answerFromMainProcess.await()
     }
 
-    private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime) {
+    val mockController by lazy {
+        AnalysisProcessMockController()
+    }
+    private fun AnalysisProcessModel.setup(runnerTimeout: Duration, lifetime: Lifetime, mockAnalysis: Boolean) {
+
         prepareDb.advise(lifetime) { request ->
-            val userClasses = request.userClassPath.map { File(it) }
-            val libsClasses = request.libsClassPath.map { File(it) }
-
-            val benchResult = ResultWithTime.calculate {
-                loadBenchDatabase(
-                    request.classpathSource,
-                    userClasses,
-                    libsClasses
-                )
-            }.chain { db ->
-                loadBenchClasspath(
-                    db,
-                    request.classpathSource,
-                    userClasses + libsClasses + concreteApiFile(),
-                    userClasses,
-                    libsClasses
-                )
-            }
-
-            when {
-                benchResult.error != null -> {
-                    processSignal.fire(benchResult.error.toProcError("db load error"))
-                }
-
-                else -> {
-                    cpSource = request.classpathSource
-                    rawBenchCp = benchResult.result!!
-                    processSignal.fire(ProcDbReady(benchResult.elapsedTime.inWholeSeconds.toInt()))
-                }
-            }
+            if (mockAnalysis)
+                mockController.prepareDbHandlerMock(this, request)
+            else
+                prepareDbHandler(request)
         }
 
         runAnalysis.advise(lifetime) { request ->
-            check(this@AnalysisProcess::cpSource.isInitialized && this@AnalysisProcess::rawBenchCp.isInitialized) {
-                "cp is not initialized"
-            }
+            if (mockAnalysis)
+                mockController.runAnalysisHandlerMock(this, request, runnerTimeout)
+            else
+                runAnalysisHandler(request, runnerTimeout) }
 
-            val analysisMode = JcSpringAnalysisMode.SpringBootTest
-            val updatedBenchResult = ResultWithTime.calculate {
-                generateTestClass(
-                    rawBenchCp,
-                    cpSource,
-                    analysisMode,
-                    request.analysisBootApp
-                )
-            }
-            when {
-                updatedBenchResult.error != null -> {
-                    println("${updatedBenchResult.error} occured")
-                    processSignal.fire(updatedBenchResult.error.toProcError("cp preparation error"))
-                }
+        // TODO: looks like hack
+        serverReady.advise(lifetime) { processSignal.fire(ProcStarted()) }
+    }
 
-                else -> {
-                    processSignal.fire(ProcCpReady())
-                    val (bench, testClass) = updatedBenchResult.result!!
-                    val springMachineOptions = JcSpringMachineOptions(
-                        analysisMode,
-                        request.toSessionConfig(testClass)
-                    )
-                    runConcreteAnalysis(springMachineOptions, bench, runnerTimeout)
-                }
-            }
+    private fun AnalysisProcessModel.runAnalysisHandler(
+        request: AnalysisRequest,
+        runnerTimeout: Duration
+    ) {
+        check(this@AnalysisProcess::cpSource.isInitialized && this@AnalysisProcess::rawBenchCp.isInitialized) {
+            "cp is not initialized"
         }
 
-        serverReady.advise(lifetime) {
-            processSignal.fire(ProcStarted())
+        val analysisMode = JcSpringAnalysisMode.SpringBootTest
+        val updatedBenchResult = ResultWithTime.calculate {
+            generateTestClass(
+                rawBenchCp,
+                cpSource,
+                analysisMode,
+                request.analysisBootApp
+            )
+        }
+        when {
+            updatedBenchResult.error != null -> {
+                println("${updatedBenchResult.error} occurred")
+                processSignal.fire(updatedBenchResult.error.toProcError("cp preparation error"))
+            }
+
+            else -> {
+                processSignal.fire(ProcCpReady())
+                val (bench, testClass) = updatedBenchResult.result!!
+                val springMachineOptions = JcSpringMachineOptions(
+                    analysisMode,
+                    request.toSessionConfig(testClass)
+                )
+                runConcreteAnalysis(springMachineOptions, bench, runnerTimeout)
+            }
+        }
+    }
+
+    private fun AnalysisProcessModel.prepareDbHandler(request: PrepareDbRequest) {
+        val userClasses = request.userClassPath.map { File(it) }
+        val libsClasses = request.libsClassPath.map { File(it) }
+
+        val benchResult = ResultWithTime.calculate {
+            loadBenchDatabase(
+                request.classpathSource,
+                userClasses,
+                libsClasses
+            )
+        }.chain { db ->
+            loadBenchClasspath(
+                db,
+                request.classpathSource,
+                userClasses + libsClasses + concreteApiFile(),
+                userClasses,
+                libsClasses
+            )
+        }
+
+        when {
+            benchResult.error != null -> {
+                processSignal.fire(benchResult.error.toProcError("db load error"))
+            }
+
+            else -> {
+                cpSource = request.classpathSource
+                rawBenchCp = benchResult.result!!
+                processSignal.fire(ProcDbReady(benchResult.elapsedTime.inWholeSeconds.toInt()))
+            }
         }
     }
 

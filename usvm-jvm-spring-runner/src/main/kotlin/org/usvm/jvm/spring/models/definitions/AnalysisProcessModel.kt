@@ -53,6 +53,10 @@ object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
         field("stackTrace", immutableList(PredefinedType.string))
     }
 
+    val procTerminated = structdef extends procNotification {
+
+    }
+
     val procAnalysisFinished = structdef extends procNotification { }
 
     init {
@@ -65,6 +69,8 @@ object AnalysisProcessModel: Ext(AnalysisProcessRoot) {
         signal("processSignal", procNotification).async
 
         signal("serverReady", PredefinedType.void).async
+
+        signal("refreshContext", PredefinedType.void).async
 
         list("generatedTests", PredefinedType.string).async
     }

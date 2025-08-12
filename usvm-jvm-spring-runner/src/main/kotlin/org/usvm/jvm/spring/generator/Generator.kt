@@ -44,8 +44,8 @@ fun generateTestClass(benchmark: BenchCp, cpSource: ClasspathSource, springAnaly
     val hasJpa = false // repositories.isNotEmpty() || entityManagerType != null && entityManagerType !is JcUnknownClass
 
     val testClassTemplateName =
-        if (hasJpa) "generated.org.springframework.boot.testClasses.SpringBootJpaTestClass"
-        else "generated.org.springframework.boot.testClasses.SpringBootTestClass"
+        if (hasJpa) "org.springframework.boot.testClasses.SpringBootJpaTestClass"
+        else "org.springframework.boot.testClasses.SpringBootTestClass"
 
     val applicationClass =
         if (springBootApp == null) {

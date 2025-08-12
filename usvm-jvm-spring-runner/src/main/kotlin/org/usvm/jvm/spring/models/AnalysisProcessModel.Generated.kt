@@ -24,6 +24,7 @@ class AnalysisProcessModel private constructor(
     private val _stopAnalysis: RdSignal<Unit>,
     private val _processSignal: RdSignal<ProcNotification>,
     private val _serverReady: RdSignal<Unit>,
+    private val _refreshContext: RdSignal<Unit>,
     private val _generatedTests: RdList<String>
 ) : RdExtBase() {
     //companion
@@ -40,6 +41,7 @@ class AnalysisProcessModel private constructor(
             serializers.register(ProcCpReady)
             serializers.register(ProcCtxReady)
             serializers.register(ProcError)
+            serializers.register(ProcTerminated)
             serializers.register(ProcAnalysisFinished)
             serializers.register(ProcNotification_Unknown)
         }
@@ -62,7 +64,7 @@ class AnalysisProcessModel private constructor(
         }
         
         
-        const val serializationHash = 3658648698745594590L
+        const val serializationHash = -5988167837025414413L
         
     }
     override val serializersOwner: ISerializersOwner get() = AnalysisProcessModel
@@ -74,6 +76,7 @@ class AnalysisProcessModel private constructor(
     val stopAnalysis: IAsyncSignal<Unit> get() = _stopAnalysis
     val processSignal: IAsyncSignal<ProcNotification> get() = _processSignal
     val serverReady: IAsyncSignal<Unit> get() = _serverReady
+    val refreshContext: IAsyncSignal<Unit> get() = _refreshContext
     val generatedTests: IMutableViewableList<String> get() = _generatedTests
     //methods
     //initializer
@@ -87,6 +90,7 @@ class AnalysisProcessModel private constructor(
         _stopAnalysis.async = true
         _processSignal.async = true
         _serverReady.async = true
+        _refreshContext.async = true
         _generatedTests.async = true
     }
     
@@ -96,6 +100,7 @@ class AnalysisProcessModel private constructor(
         bindableChildren.add("stopAnalysis" to _stopAnalysis)
         bindableChildren.add("processSignal" to _processSignal)
         bindableChildren.add("serverReady" to _serverReady)
+        bindableChildren.add("refreshContext" to _refreshContext)
         bindableChildren.add("generatedTests" to _generatedTests)
     }
     
@@ -106,6 +111,7 @@ class AnalysisProcessModel private constructor(
         RdSignal<AnalysisRequest>(AnalysisRequest),
         RdSignal<Unit>(FrameworkMarshallers.Void),
         RdSignal<ProcNotification>(AbstractPolymorphic(ProcNotification)),
+        RdSignal<Unit>(FrameworkMarshallers.Void),
         RdSignal<Unit>(FrameworkMarshallers.Void),
         RdList<String>(FrameworkMarshallers.String)
     )
@@ -121,6 +127,7 @@ class AnalysisProcessModel private constructor(
             print("stopAnalysis = "); _stopAnalysis.print(printer); println()
             print("processSignal = "); _processSignal.print(printer); println()
             print("serverReady = "); _serverReady.print(printer); println()
+            print("refreshContext = "); _refreshContext.print(printer); println()
             print("generatedTests = "); _generatedTests.print(printer); println()
         }
         printer.print(")")
@@ -133,6 +140,7 @@ class AnalysisProcessModel private constructor(
             _stopAnalysis.deepClonePolymorphic(),
             _processSignal.deepClonePolymorphic(),
             _serverReady.deepClonePolymorphic(),
+            _refreshContext.deepClonePolymorphic(),
             _generatedTests.deepClonePolymorphic()
         )
     }
@@ -313,7 +321,7 @@ data class PrepareDbRequest (
 
 
 /**
- * #### Generated from [AnalysisProcessModel.kt:56]
+ * #### Generated from [AnalysisProcessModel.kt:60]
  */
 class ProcAnalysisFinished (
 ) : ProcNotification (
@@ -778,6 +786,58 @@ class ProcStarted (
     //pretty print
     override fun print(printer: PrettyPrinter)  {
         printer.println("ProcStarted (")
+        printer.print(")")
+    }
+    
+    override fun toString() = PrettyPrinter().singleLine().also { print(it) }.toString()
+    //deepClone
+    //contexts
+}
+
+
+/**
+ * #### Generated from [AnalysisProcessModel.kt:56]
+ */
+class ProcTerminated (
+) : ProcNotification (
+) {
+    //companion
+    
+    companion object : IMarshaller<ProcTerminated> {
+        override val _type: KClass<ProcTerminated> = ProcTerminated::class
+        
+        @Suppress("UNCHECKED_CAST")
+        override fun read(ctx: SerializationCtx, buffer: AbstractBuffer): ProcTerminated  {
+            return ProcTerminated()
+        }
+        
+        override fun write(ctx: SerializationCtx, buffer: AbstractBuffer, value: ProcTerminated)  {
+        }
+        
+        
+    }
+    //fields
+    //methods
+    //initializer
+    //secondary constructor
+    //equals trait
+    override fun equals(other: Any?): Boolean  {
+        if (this === other) return true
+        if (other == null || other::class != this::class) return false
+        
+        other as ProcTerminated
+        
+        
+        return true
+    }
+    //hash code trait
+    override fun hashCode(): Int  {
+        var __r = 0
+        return __r
+    }
+    //pretty print
+    override fun print(printer: PrettyPrinter)  {
+        printer.println("ProcTerminated (")
         printer.print(")")
     }
     

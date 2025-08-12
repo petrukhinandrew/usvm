@@ -3,20 +3,34 @@ package org.usvm.jvm.spring.runner
 import com.jetbrains.rd.framework.Protocol
 import com.jetbrains.rd.framework.base.RdExtBase
 import com.jetbrains.rd.framework.util.NetUtils
+import com.jetbrains.rd.framework.util.launch
 import com.jetbrains.rd.util.lifetime.LifetimeDefinition
 import com.jetbrains.rd.util.lifetime.isAlive
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentLinkedDeque
 import kotlin.io.path.absolutePathString
+import kotlin.properties.Delegates
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.callbackFlow
+import mu.KLogging
 import org.usvm.instrumentation.executor.RdProcessRunnerBase
 import org.usvm.instrumentation.util.InstrumentationModuleConstants
 import org.usvm.instrumentation.util.UTestExecutorInitException
 import org.usvm.jmv.spring.models.AnalysisProcessModel
 import org.usvm.jmv.spring.models.AnalysisRequest
+import org.usvm.jmv.spring.models.PrepareDbRequest
+import org.usvm.jmv.spring.models.ProcNotification
+import org.usvm.jmv.spring.models.ProcTerminated
 import org.usvm.jmv.spring.models.analysisProcessModel
+
+val logger = object : KLogging() {}.logger
 
 class AnalysisRdProcessRunner(
     process: Process,
@@ -33,13 +47,28 @@ class AnalysisRdProcessRunner(
         return protocol.analysisProcessModel
     }
 
-    fun startAnalysis(request: AnalysisRequest) {
-        model.runAnalysis.fire(request)
+    fun bindOnProcessExit(callback: () -> Unit) {
+        process.onExit().thenRun { callback() }
     }
 }
 
+class NoProc: ProcNotification()
+
 @Suppress("unused")
-class AnalysisProcessRunner(val lifetime: LifetimeDefinition): AutoCloseable {
+class AnalysisProcessRunner(val lifetime: LifetimeDefinition) {
+
+    private val workingDir = Files.createTempDirectory("springAnalysis").toFile()
+
+    private val localLambdaDir get() = workingDir.resolve("lambda").createOrClear()
+
+    private val localSpringDir get() = workingDir.resolve("spring").createOrClear()
+
+    private val tempPolicyPath: Path = generateTempPolicyFile(workingDir.toPath())
+
+    init {
+        workingDir.deleteOnExit() // TODO: check if it should be recursive?
+        tempPolicyPath.toFile().deleteOnExit()
+    }
 
     companion object {
         private const val localAgentPath =
@@ -54,27 +83,59 @@ class AnalysisProcessRunner(val lifetime: LifetimeDefinition): AutoCloseable {
 
     val model: AnalysisProcessModel get() = rdProcessRunner.model
 
-    override fun close() {
-        lifetime.terminate()
-    }
+    val isAlive: Boolean get() = lifetime.isAlive
 
-    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean): Process {
+    private val runnerStateMutable = MutableStateFlow<ProcNotification>(NoProc())
+    val runnerState: StateFlow<ProcNotification>
+        get() = runnerStateMutable
+
+    val generatedTests = ConcurrentLinkedDeque<String>()
+
+    suspend fun start(timeoutSeconds: Int, javaPath: String, allowDebugging: Boolean) {
         val port = NetUtils.findFreePort(0)
-        val process = runJar(
-            javaPath,
-            localRunnerPath,
-            buildJvmArgs(
-                analysisProcessMainClass,
+        val process = runUsvmSpringJar(
+            javaPath = javaPath,
+            targetJarPath = localRunnerPath,
+            springDir = localSpringDir,
+            lambdaDir = localLambdaDir,
+            arguments = buildJvmArgs(
+                mainClazz = analysisProcessMainClass,
+                agentPath = localAgentPath,
+                lambdaDirPath = localLambdaDir.absolutePath,
+                tempPolicyPath = tempPolicyPath.absolutePathString(),
                 allowDebugging = allowDebugging
-            ) + listOf("-t", timeoutSeconds.toString(), "-p", port.toString())
+            ) + listOf("-t", timeoutSeconds.toString(), "-p", port.toString()),
         ) ?: error("cannot run jar")
         rdProcessRunner =
             AnalysisRdProcessRunner(process = process, checkProcessAliveDelay = 1.seconds, rdPort = port, lifetimeDefinition = lifetime)
         rdProcessRunner.init()
-        return process
+
+        rdProcessRunner.bindOnProcessExit {
+            runnerStateMutable.value = ProcTerminated()
+        }
+
+        model.processSignal.advise(lifetime) {
+            runnerStateMutable.value = it
+        }
+
+        model.generatedTests.advise(lifetime) {
+            if (it.newValueOpt != null) {
+                generatedTests.add(it.newValueOpt)
+            }
+        }
     }
 
-    suspend fun ensureRunnerAlive() {
+    fun stop() {
+        if (lifetime.isAlive) {
+            rdProcessRunner.destroy()
+            resetState()
+        }
+        else {
+            logger.warn("AnalysisProcessRunner stop request after lifetime terminated")
+        }
+    }
+
+    private suspend fun ensureRunnerAlive() {
         check(lifetime.isAlive) { "Executor already closed" }
         for (i in 0..InstrumentationModuleConstants.triesToRecreateExecutorRdProcess) {
             if (rdProcessRunner.isAlive) {
@@ -93,215 +154,31 @@ class AnalysisProcessRunner(val lifetime: LifetimeDefinition): AutoCloseable {
 
     suspend fun startAnalysis(request: AnalysisRequest) {
         ensureRunnerAlive()
-        return rdProcessRunner.startAnalysis(request)
+        model.runAnalysis.fire(request)
     }
 
-    private val workingDir = Files.createTempDirectory("springAnalysis").toFile()
-
-    private val localLambdaDir get() = workingDir.resolve("lambda").createOrClear()
-
-    private val localSpringDir get() = workingDir.resolve("spring").createOrClear()
-
-    private val tempPolicyPath: Path
-
-    init {
-        workingDir.deleteOnExit()
-
-        val tempPolicyContent = """
-            grant {
-                permission java.security.AllPermission "", "";
-            };
-        """.trimIndent()
-        val policyPath = Files.createTempFile(workingDir.toPath(), "webExplorationPolicy", ".policy")
-        tempPolicyPath = Files.write(policyPath, tempPolicyContent.encodeToByteArray())
-        tempPolicyPath.toFile().deleteOnExit()
+    suspend fun stopAnalysis() {
+        ensureRunnerAlive()
+        model.stopAnalysis.fire(Unit)
     }
 
-    private val addOpens: List<String> get() {
-        val javaBasePackages = listOf(
-            "jdk.internal.misc",
-            "java.lang",
-            "java.lang.reflect",
-            "sun.security.provider",
-            "jdk.internal.event",
-            "jdk.internal.jimage",
-            "jdk.internal.jimage.decompressor",
-            "jdk.internal.jmod",
-            "jdk.internal.jtrfs",
-            "jdk.internal.loader",
-            "jdk.internal.logger",
-            "jdk.internal.math",
-            "jdk.internal.misc",
-            "jdk.internal.module",
-            "jdk.internal.org.objectweb.asm.commons",
-            "jdk.internal.org.objectweb.asm.signature",
-            "jdk.internal.org.objectweb.asm.tree",
-            "jdk.internal.org.objectweb.asm.tree.analysis",
-            "jdk.internal.org.objectweb.asm.util",
-            "jdk.internal.org.xml.sax",
-            "jdk.internal.org.xml.sax.helpers",
-            "jdk.internal.perf",
-            "jdk.internal.platform",
-            "jdk.internal.ref",
-            "jdk.internal.reflect",
-            "jdk.internal.util",
-            "jdk.internal.util.jar",
-            "jdk.internal.util.xml",
-            "jdk.internal.util.xml.impl",
-            "jdk.internal.vm",
-            "jdk.internal.vm.annotation",
-            "java.util.concurrent.atomic",
-            "java.io",
-            "java.util.zip",
-            "java.util.concurrent",
-            "sun.security.util",
-            "java.lang.invoke",
-            "java.lang.ref",
-            "java.lang.constant",
-            "java.util",
-            "java.util.concurrent.locks",
-            "java.nio.charset",
-            "java.util.regex",
-            "java.net",
-            "sun.util.locale",
-            "java.util.stream",
-            "java.security",
-            "java.time",
-            "jdk.internal.access",
-            "sun.reflect.annotation",
-            "sun.reflect.generics.reflectiveObjects",
-            "sun.reflect.generics.factory",
-            "sun.reflect.generics.tree",
-            "sun.reflect.generics.scope",
-            "sun.invoke.util",
-            "sun.nio.cs",
-            "sun.nio.fs",
-            "java.nio",
-            "java.time.format",
-            "java.time.zone",
-            "java.time.temporal",
-            "java.text",
-            "sun.util.calendar",
-            "sun.net.www.protocol.jar",
-            "java.util.jar",
-            "java.nio.file.attribute",
-            "java.util.function",
-            "java.math",
-            "java.nio.file",
-            "java.nio.channels",
-            "javax.net.ssl",
-            "java.lang.annotation",
-            "java.lang.runtime",
-            "javax.crypto",
-            "java.nio.file.spi",
-            "jdk.internal.jrtfs",
-            "sun.nio.ch",
-            "sun.net.util",
-        )
-
-        val javaBaseAddOpens = javaBasePackages.flatMap {
-            openPackageEntry("java.base", it)
-        }
-
-        val misc = listOf(
-            openPackageEntry("java.management", "javax.management"),
-            openPackageEntry("java.logging", "java.util.logging"),
-            openPackageEntry("java.desktop", "java.beans"),
-            openPackageEntry("java.xml", "com.sun.org.apache.xerces.internal.impl.xs"),
-            openPackageEntry("jdk.zipfs", "jdk.nio.zipfs"),
-            openPackageEntry("java.instrument", "sun.instrument"),
-            openPackageEntry("java.xml", "com.sun.xml.internal.stream"),
-            openPackageEntry("java.xml", "com.sun.org.apache.xerces.internal.impl"),
-            openPackageEntry("java.xml", "com.sun.org.apache.xerces.internal.utils"),
-            openPackageEntry("java.sql", "java.sql"),
-        ).flatten()
-
-        return javaBaseAddOpens + misc
+    suspend fun prepareDb(dbRequest: PrepareDbRequest) {
+        ensureRunnerAlive()
+        model.prepareDb.fire(dbRequest)
     }
 
-    private val addExports: List<String> get() {
-        return listOf(
-            exportPackageEntry("java.base", "jdk.internal.access.foreign"),
-            exportPackageEntry("java.base", "sun.security.action"),
-            exportPackageEntry("java.base", "sun.util.locale"),
-            exportPackageEntry("java.base", "jdk.internal.misc"),
-            exportPackageEntry("java.base", "jdk.internal.reflect"),
-            exportPackageEntry("java.base", "sun.nio.cs"),
-            exportPackageEntry("java.xml", "com.sun.org.apache.xerces.internal.impl.xs.util"),
-            exportPackageEntry("java.base", "jdk.internal.loader")
-        ).flatten()
+    suspend fun refreshContext() {
+        ensureRunnerAlive()
+        model.refreshContext.fire(Unit)
     }
 
-    private fun openPackageEntry(module: String, pkg: String): List<String> =
-        listOf("--add-opens", "$module/$pkg=ALL-UNNAMED")
-
-    fun exportPackageEntry(module: String, pkg: String): List<String> =
-        listOf("--add-exports", "$module/$pkg=ALL-UNNAMED")
-
-    private fun buildJvmArgs(
-        mainClazz: String,
-        agentPath: String = localAgentPath,
-        lambdaDirPath: String = localLambdaDir.absolutePath,
-        allowDebugging: Boolean = false
-    ): List<String> {
-        return listOf(
-            "-Xmx12g",
-            "-Djava.security.manager",
-            "-Djava.security.policy=${tempPolicyPath.absolutePathString()}",
-            "-Djdk.util.jar.enableMultiRelease=false",
-            "-Djdk.util.jar.enableMultiRelease=false",
-            "-javaagent:$agentPath",
-            "-Djdk.internal.lambda.dumpProxyClasses=${lambdaDirPath}",
-            "--illegal-access=warn",
-            "-XX:+UseParallelGC"
-        ) +
-                (if (allowDebugging)
-                    listOf(
-                        "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:${NetUtils.findFreePort(0)}"
-                    )
-                else
-                    emptyList()) +
-                            addOpens +
-                            addExports +
-                            mainClazz
+    suspend fun notifyServerReady() {
+        ensureRunnerAlive()
+        model.serverReady.fire(Unit)
     }
 
-    @Suppress("SameParameterValue")
-    private fun runJar(javaPath: String, jarPath: String, arguments: List<String>): Process? {
-        val collectorsJarPath =
-            "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-instrumentation/build/libs/usvm-jvm-instrumentation-collectors.jar"
-        val instrumentationJarPath =
-            "/Users/petrukhinandrew/IdeaProjects/usvm-renderilka/usvm-jvm-instrumentation/build/libs/usvm-jvm-instrumentation-runner.jar"
-        val usvmJvmApi =
-            "/Users/petrukhinandrew/.m2/repository/org/usvm/usvm-jvm-api/1.2.10/usvm-jvm-api-1.2.10.jar"
-        val approximations =
-            "/Users/petrukhinandrew/.m2/repository/org/usvm/approximations/java/stdlib/approximations/0.0.0/approximations-0.0.0.jar"
-        val concreteApi =
-            "/Users/petrukhinandrew/.m2/repository/org/usvm/usvm-jvm-concrete-api/1.2.10/usvm-jvm-concrete-api-1.2.10.jar"
-        try {
-            val startCommand = listOf(javaPath, "-cp", jarPath) + arguments
-            val procBuilder = ProcessBuilder(startCommand).inheritIO()
-            with(procBuilder.environment()) {
-                put("springDir", localSpringDir.absolutePath)
-                put("lambdaDir", localLambdaDir.absolutePath)
-                put("usvm.jvm.api.jar.path", usvmJvmApi)
-                put("usvm.jvm.approximations.jar.path", approximations)
-                put("usvm-jvm-instrumentation-jar", instrumentationJarPath)
-                put("usvm-jvm-collectors-jar", collectorsJarPath)
-                put("usvm.jvm.concrete.api.jar.path", concreteApi)
-            }
-            return procBuilder.start()
-        } catch (e: Exception) {
-            println("DBG fail ${e.message}")
-        }
-        return null
-    }
-
-    fun File.createOrClear(): File = apply {
-        if (exists()) {
-            listFiles()?.forEach { it.deleteRecursively() }
-        } else {
-            mkdirs()
-        }
+    private fun resetState() {
+        generatedTests.clear()
+        runnerStateMutable.value = NoProc()
     }
 }
