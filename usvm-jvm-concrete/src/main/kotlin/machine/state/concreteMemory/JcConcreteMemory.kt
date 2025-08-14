@@ -1,7 +1,6 @@
 package machine.state.concreteMemory
 
 import io.ksmt.utils.asExpr
-import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import machine.JcConcreteInvocationResult
 import machine.JcConcreteMachineOptions
@@ -26,7 +25,6 @@ import org.usvm.UExpr
 import org.usvm.UIndexedMocker
 import org.usvm.USort
 import org.usvm.api.util.JcTestStateResolver.ResolveMode
-import org.usvm.jvm.util.invoke
 import org.usvm.collection.array.UArrayRegion
 import org.usvm.collection.array.UArrayRegionId
 import org.usvm.collection.array.length.UArrayLengthsRegion
@@ -72,6 +70,9 @@ import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
 import org.usvm.memory.URegistersStack
 import org.usvm.jvm.util.name
+import org.usvm.jvm.util.toJavaConstructor
+import org.usvm.jvm.util.toJavaExecutable
+import org.usvm.jvm.util.toJavaMethod
 import org.usvm.jvm.util.typedField
 import org.usvm.model.UModelBase
 import org.usvm.util.onNone
@@ -86,7 +87,6 @@ import utils.isStaticApproximation
 import utils.jcTypeOf
 import utils.setStaticFieldValue
 import utils.toJavaField
-import utils.toJavaMethod
 
 //region Concrete Memory
 
@@ -327,7 +327,9 @@ open class JcConcreteMemory(
                 method.isConstructor && enclosingClass.isAbstract ||
                         enclosingClass.isEnum && method.isConstructor ||
                         // Case for method, which exists only in approximations
-                        method is JcEnrichedVirtualMethod && !method.isClassInitializer && method.toJavaMethod == null ||
+                        method is JcEnrichedVirtualMethod &&
+                        !method.isClassInitializer &&
+                        method.toJavaExecutable(JcConcreteMemoryClassLoader) == null ||
                         enclosingClass.isInternalType &&
                         enclosingClass.name != InitHelper::class.java.typeName &&
                         enclosingClass.name != ClassLoaderGetHelper::class.java.typeName ||
@@ -496,7 +498,23 @@ open class JcConcreteMemory(
         }
 
         val (resultObj, exception) = executor.executeWithResult {
-            method.invoke(JcConcreteMemoryClassLoader, thisObj, objParameters)
+            val invokeHelperClass = JcConcreteMemoryClassLoader.loadClass("org.usvm.concrete.api.internal.InvokeHelper")
+            if (method.isConstructor) {
+                invokeHelperClass.declaredMethods.single { it.name == "newInstance" }
+                    .invoke(
+                        null,
+                        method.toJavaConstructor(JcConcreteMemoryClassLoader),
+                        objParameters.toTypedArray()
+                    )
+            } else {
+                invokeHelperClass.declaredMethods.single { it.name == "invokeMethod"}
+                    .invoke(
+                        null,
+                        method.toJavaMethod(JcConcreteMemoryClassLoader),
+                        thisObj,
+                        objParameters.toTypedArray()
+                    )
+            }
         }
 
         if (exception == null) {
