@@ -4,6 +4,7 @@ import com.github.javaparser.StaticJavaParser
 import com.github.javaparser.printer.DefaultPrettyPrinter
 import org.jacodb.api.jvm.JcClassOrInterface
 import org.jacodb.api.jvm.JcClasspath
+import org.usvm.jvm.rendering.spring.webMvcTestRenderer.JcSpringMvcTestInfo
 import org.usvm.jvm.rendering.testRenderer.JcTestInfo
 import org.usvm.jvm.rendering.testTransformers.JcCallCtorTransformer
 import org.usvm.jvm.rendering.testTransformers.JcPrimitiveWrapperTransformer
@@ -68,5 +69,37 @@ class JcTestsRenderer {
             renderedFiles[testClassInfo] = printer.print(renderedCu)
         }
         return renderedFiles
+    }
+
+    fun renderSingleTestInClass(
+        testClassStub: JcClassOrInterface,
+        renderInfo: Pair<UTest, JcSpringMvcTestInfo>,
+        isAccessibleFromTestClass: ((JcClassOrInterface) -> Boolean)? = null
+    ): String {
+        val (uTest, testInfo) = renderInfo
+        val controller = testInfo.controller
+        val cp = controller.classpath
+
+        val testClassInfo = JcTestClassInfo.from(testInfo)
+
+        val fileRenderer = JcTestFileRendererFactory.testFileRendererFor(
+            testClassInfo.testPackageName,
+            cp,
+            testClassInfo,
+            ReflectionUtilsInlineStrategy.Inline(),
+            isAccessibleFromTestClass
+        )
+
+        val testClassRenderer = fileRenderer.getOrAddClass(testClassInfo.testClassName)
+        testClassStub.annotations.forEach { testClassRenderer.addAnnotation(it) }
+
+        val transformedTest = transformers.fold(uTest) { currentTest, transformer ->
+            transformer.transform(currentTest)
+        }
+
+        testClassRenderer.addTest(transformedTest, testInfo.testNamePrefix)
+
+        val renderedCu = fileRenderer.render()
+        return DefaultPrettyPrinter().print(renderedCu)
     }
 }

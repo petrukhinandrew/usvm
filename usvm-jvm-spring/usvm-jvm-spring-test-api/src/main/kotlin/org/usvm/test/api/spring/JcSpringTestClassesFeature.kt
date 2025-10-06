@@ -272,6 +272,14 @@ class JcSpringTestClassesFeature: JcClasspathExtFeature {
 
         return classes.find { it.name == name }?.let { AbstractJcResolvedResult.JcResolvedClassResultImpl(name, it) }
     }
+
+    override fun findClasses(classpath: JcClasspath, name: String): List<JcClassOrInterface>? {
+        if (!this::cp.isInitialized) {
+            bind(classpath)
+        }
+
+        return classes.filter { it.name == name}
+    }
 }
 
 internal fun getSpringTestClassesFeatureIn(cp: JcClasspath): JcSpringTestClassesFeature {

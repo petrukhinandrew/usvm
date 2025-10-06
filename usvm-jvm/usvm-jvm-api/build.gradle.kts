@@ -8,6 +8,10 @@ plugins {
     `maven-publish`
 }
 
+repositories {
+    mavenLocal()
+}
+
 tasks {
     withType<JavaCompile> {
         sourceCompatibility = JavaVersion.VERSION_1_8.toString()
@@ -38,6 +42,9 @@ dependencies {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            groupId = "org.usvm"
+            artifactId = "usvm-jvm-api"
+            version = "1.2.10"
             from(components["java"])
         }
     }

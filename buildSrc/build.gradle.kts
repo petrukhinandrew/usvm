@@ -9,6 +9,7 @@ val gjavahVersion = "0.3.1"
 repositories {
     mavenCentral()
     gradlePluginPortal()
+    mavenLocal()
     maven("https://jitpack.io")
 }
 

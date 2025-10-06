@@ -11,9 +11,13 @@ internal class TestDependenciesManager(
         private const val STARTER_TEST_DEPENDENCIES_PATH = "./test-dependencies/starter-test"
         private const val SECURITY_TEST_DEPENDENCIES_PATH = "./test-dependencies/security-test"
         private const val VALIDATION_DEPENDENCIES_PATH = "./test-dependencies/validation"
+        private const val TESTCONTAINERS_DEPENDENCIES_PATH = "./test-dependencies/testcontainers"
+        private const val KAFKA_DEPENDENCIES_PATH = "./test-dependencies/kafka-test"
     }
 
     val springBootVersion = getSpringBootVersion(projectDeps) ?: error("spring boot version not found")
+
+    val springCoreVersion = getSpringCoreVersion(projectDeps) ?: error("spring core version not found")
 
     val securityVersion = getSecurityVersion(projectDeps)
 
@@ -34,6 +38,18 @@ internal class TestDependenciesManager(
                 springBootVersion,
                 File(VALIDATION_DEPENDENCIES_PATH)
             )
+
+        // TODO: add predicate
+        resultTestDeps += findVersion(
+            springBootVersion,
+            File(TESTCONTAINERS_DEPENDENCIES_PATH)
+        )
+
+        // TODO: add predicate
+        resultTestDeps += findVersion(
+            springCoreVersion,
+            File(KAFKA_DEPENDENCIES_PATH)
+        )
 
         clearDuplicates(projectDeps, resultTestDeps)
     }
@@ -58,6 +74,16 @@ internal class TestDependenciesManager(
         return mainAttributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION)
     }
 
+    private fun getSpringCoreVersion(projectDeps: List<File>): String? {
+        val springCorePackage = findPackage("spring-core", projectDeps)
+            ?: return null
+        val mainAttributes = packageMainAttributes(springCorePackage)
+            ?: return null
+        val title = mainAttributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE)
+        check(title == "spring-core")
+        return mainAttributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION)
+    }
+
     private fun findPackage(name: String, projectDeps: List<File>): File? {
         return projectDeps.find {
             nameWithoutVersion(it) == name
@@ -66,8 +92,8 @@ internal class TestDependenciesManager(
 
     private fun clearDuplicates(projectDeps: List<File>, addedTestDeps: List<File>): List<File> {
         val depsWithNames = hashMapOf<String, File>()
-        addedTestDeps.associateByTo(depsWithNames) { nameWithoutVersion(it) }
-        projectDeps.associateByTo(depsWithNames) { nameWithoutVersion(it) }
+        addedTestDeps.associateByTo(depsWithNames) { it.name /*nameWithoutVersion(it)*/ }
+        projectDeps.associateByTo(depsWithNames) { it.name /*nameWithoutVersion(it)*/ }
         return depsWithNames.values.toList()
     }
 

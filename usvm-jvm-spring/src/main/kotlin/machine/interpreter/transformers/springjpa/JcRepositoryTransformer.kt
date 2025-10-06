@@ -78,7 +78,7 @@ class JcRepositoryTransformer(val collector: JcTableInfoCollector) : JcClassExtF
     override fun methodsOf(clazz: JcClassOrInterface, originalMethods: List<JcMethod>): List<JcMethod>? {
 
         // Remember to call bindMachineOptions!!!
-        if (!clazz.isJpaRepository || !machineOptions!!.isProjectLocation(clazz)) return null
+        if (!clazz.isJpaRepository || !machineOptions!!.isUserClass(clazz)) return null
 
         val dataClass = clazz.signature!!.genericTypesFromSignature.first().let { clazz.classpath.findClass(it) }
         val cp = dataClass.classpath

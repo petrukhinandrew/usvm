@@ -3,6 +3,10 @@ plugins {
     id("usvm.kotlin-conventions")
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     implementation(project(":usvm-jvm"))
     implementation(project(":usvm-core"))
@@ -23,3 +27,11 @@ dependencies {
 
 tasks.getByName("compileTestKotlin").dependsOn("generateTestGrammarSource")
 tasks.getByName("compileKotlin").dependsOn("generateGrammarSource")
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+}

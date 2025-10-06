@@ -7,8 +7,15 @@ import createOrClear
 import generateTestClass
 import loadWebAppBenchCp
 import logTime
+import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.div
+import kotlin.system.exitProcess
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import machine.JcConcreteMachineOptions
 import machine.JcSpringTestGenerationMode
+import machine.JcSpringAnalysisMode
 import machine.JcSpringMachine
 import machine.JcSpringMachineOptions
 import machine.JcSpringTestObserver
@@ -26,59 +33,26 @@ import org.usvm.machine.JcMachineOptions
 import org.usvm.test.api.UTest
 import testGeneration.SpringTestInfo
 import util.SpringApproximationPaths
-import java.io.File
 import java.io.PrintStream
-import kotlin.io.path.Path
-import kotlin.io.path.div
-import kotlin.system.exitProcess
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
-
-private fun loadWebPetClinicBench(): BenchCp {
-    val petClinicDir = Path("/Users/tozarin/Documents/kot/spring-petclinic/build/libs")
-    val buildName = "spring-petclinic-3.2.0"
-    return loadWebAppBenchCp(petClinicDir / "${buildName}.jar", petClinicDir / "${buildName}/BOOT-INF/lib")
-}
-
-private fun loadWebGoatBench(): BenchCp {
-    val webGoatDir = Path("/Users/michael/Documents/Work/WebGoat/target/build")
-    return loadWebAppBenchCp(webGoatDir / "BOOT-INF/classes", webGoatDir / "BOOT-INF/lib")
-}
-
-private fun loadKafdropBench(): BenchCp {
-    val kafdropDir = Path("/Users/michael/Documents/Work/kafdrop/target/build")
-    return loadWebAppBenchCp(kafdropDir / "BOOT-INF/classes", kafdropDir / "BOOT-INF/lib")
-}
-
-private fun loadKlawBench(): BenchCp {
-    val klawDir = Path("/Users/michael/Documents/Work/klaw/core/target/build")
-    return loadWebAppBenchCp(klawDir / "BOOT-INF/classes", klawDir / "BOOT-INF/lib")
-}
-
-private fun loadSynthBench(): BenchCp {
-    val benchDir = Path("C:/Users/arthur/Documents/usvm-spring-benchmarks/build/libs")
-    return loadWebAppBenchCp(benchDir / "BOOT-INF/classes", benchDir / "BOOT-INF/lib")
-}
-
-private fun loadJHipsterBench(): BenchCp {
-    val benchDir = Path("/Users/michael/Documents/Work/jhipster-registry/target/build")
-    return loadWebAppBenchCp(benchDir / "BOOT-INF/classes", benchDir / "BOOT-INF/lib")
-}
+import machine.JcBuildDirsConcreteMachineOptionsImpl
+import machine.JcSpringAnyAnalysisConfig
 
 private fun loadBenchFromEnv(): BenchCp {
-    val benchPath = System.getenv("usvm.benchmark")
-    val libsPath = System.getenv("usvm.libs")
-    return loadWebAppBenchCp(Path(benchPath), Path(libsPath))
+    val benchDir = Path(System.getenv("usvm.benchmark"))
+    return loadWebAppBenchCp(benchDir / "classes", benchDir / "lib")
 }
 
 fun main() {
     val benchCp = logTime("Init jacodb") {
-        loadWebPetClinicBench()
+        loadBenchFromEnv()
     }
 
     logTime("Analysis ALL") {
         benchCp.use { runWebBench(it) }
+//        benchCp.use { analyzeBench(it, 2.minutes) }
     }
+
+    exitProcess(0)
 }
 
 private fun runWebBench(benchmark: BenchCp) {
@@ -101,19 +75,21 @@ private fun runWebBench(benchmark: BenchCp) {
     analyzeBench(benchmark, options)
 }
 
-fun analyzeBench(benchmark: BenchCp, options: UMachineOptions) {
+fun analyzeBench(benchmark: BenchCp, options: UMachineOptions, runnerTimeout: Duration = Duration.INFINITE, springBootApp: String? = null, testObserver: JcSpringTestObserver = JcSpringTestObserver()): List<SpringTestInfo> {
     val springAnalysisMode = JcSpringTestGenerationMode.SpringBootTest
     val springApproximationPaths = SpringApproximationPaths()
     val newBench = generateTestClass(benchmark, springAnalysisMode, springApproximationPaths)
 
-    val jcConcreteMachineOptions = JcConcreteMachineOptions(
+    val jcConcreteMachineOptions = JcBuildDirsConcreteMachineOptionsImpl(
         projectLocations = newBench.classLocations,
         dependenciesLocations = newBench.depsLocations,
     )
     newBench.bindMachineOptions(jcConcreteMachineOptions)
+
     val jcSpringMachineOptions = JcSpringMachineOptions(
         springTestGenerationMode = springAnalysisMode,
-        springApproximationPaths = springApproximationPaths
+        springApproximationPaths = springApproximationPaths,
+        sessionConfig = JcSpringAnyAnalysisConfig()
     )
 
     val cp = newBench.cp
@@ -125,8 +101,6 @@ fun analyzeBench(benchmark: BenchCp, options: UMachineOptions) {
         forkOnImplicitExceptions = true,
         arrayMaxSize = 10_000,
     )
-
-    val testObserver = JcSpringTestObserver()
 
     val machine = JcSpringMachine(
         cp,
@@ -145,10 +119,10 @@ fun analyzeBench(benchmark: BenchCp, options: UMachineOptions) {
 
     reproduceTests(testObserver.generatedTests, jcConcreteMachineOptions, cp)
 
-    exitProcess(0)
+    return testObserver.generatedTests
 }
 
-private fun SpringTestInfo.toRenderInfo(): Pair<UTest, JcSpringMvcTestInfo> {
+fun SpringTestInfo.toRenderInfo(): Pair<UTest, JcSpringMvcTestInfo> {
     return this.test to JcSpringMvcTestInfo(this.method, this.isExceptional)
 }
 

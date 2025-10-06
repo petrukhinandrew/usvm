@@ -88,7 +88,7 @@ open class JcInterpreter(
     protected val ctx: JcContext,
     private val applicationGraph: JcApplicationGraph,
     private val options: JcMachineOptions,
-    private val observer: JcInterpreterObserver? = null,
+    protected val observer: JcInterpreterObserver? = null,
     var forkBlackList: UForkBlackList<JcState, JcInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<JcState>() {
 

@@ -2,6 +2,10 @@ plugins {
     id("usvm.kotlin-conventions")
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     implementation(project(":usvm-jvm"))
     implementation(project(":usvm-core"))
@@ -117,6 +121,9 @@ tasks.withType<Test> {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            groupId = "org.usvm"
+            artifactId = "usvm-jvm-concrete"
+            version = "1.2.10"
             from(components["java"])
         }
     }

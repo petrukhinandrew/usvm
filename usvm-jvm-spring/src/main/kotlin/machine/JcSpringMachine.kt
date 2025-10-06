@@ -61,7 +61,7 @@ class JcSpringMachine(
     }
 
     override fun methodsToTrackCoverage(methods: List<JcMethod>): Set<JcMethod> = with(ctx) {
-        val projectClasses = cp.classesOfLocations(jcConcreteMachineOptions.projectLocations)
+        val projectClasses = jcConcreteMachineOptions.userClassesIn(cp)
             .filter { it.isSpringController || it.isSpringFilter || it.isSpringHandlerInterceptor }
 
         val databaseLocations = cp.locations.filter {

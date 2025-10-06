@@ -36,6 +36,10 @@ import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.jvm.javaConstructor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import org.usvm.api.createUTest
+import org.usvm.jvm.rendering.JcTestsRenderer
+import org.usvm.jvm.rendering.ReflectionUtilsInlineStrategy
+import org.usvm.jvm.rendering.unsafeRenderer.JcUnsafeTestInfo
 
 @ExtendWith(UTestRunnerController::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -823,9 +827,15 @@ open class JavaMethodTestRunner : TestRunner<JcTest, KFunction<*>, KClass<*>?, J
 
     override val runner: (KFunction<*>, UMachineOptions) -> List<JcTest> = { method, options ->
         val jcMethod = cp.getJcMethodByName(method)
-
+        val renderer = JcTestsRenderer()
         createMachine(cp, options, interpreterObserver).use { machine ->
             val states = machine.analyze(jcMethod.method, targets)
+            val testInfo = states.map {
+                createUTest(jcMethod, it) to JcUnsafeTestInfo(jcMethod.method, false)
+            }
+            val render = renderer.renderTests(cp, testInfo, ReflectionUtilsInlineStrategy.NestedClass())
+            render.forEach { t, u ->  println(u); println() }
+
             states.map { testResolver.resolve(jcMethod, it) }
         }
     }

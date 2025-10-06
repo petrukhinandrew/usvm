@@ -17,9 +17,16 @@ import org.jacodb.api.jvm.JcField
 import org.jacodb.api.jvm.JcMethod
 import org.jacodb.api.jvm.JcPrimitiveType
 import org.jacodb.api.jvm.JcType
-import org.jacodb.api.jvm.ext.*
+import org.jacodb.api.jvm.ext.autoboxIfNeeded
+import org.jacodb.api.jvm.ext.boolean
+import org.jacodb.api.jvm.ext.findClass
+import org.jacodb.api.jvm.ext.findType
+import org.jacodb.api.jvm.ext.isAssignable
+import org.jacodb.api.jvm.ext.objectType
+import org.jacodb.api.jvm.ext.toType
 import org.jacodb.impl.features.classpaths.JcUnknownClass
 import org.jacodb.impl.features.hierarchyExt
+import org.jacodb.api.jvm.ext.void
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
@@ -53,6 +60,10 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
+import org.jacodb.api.jvm.ext.jvmSignature
+import org.jacodb.impl.features.hierarchyExt
+import org.usvm.machine.JcVirtualMethodCallInst
 
 data class HandlerMethodData(
     val pathTemplate: String,
@@ -556,15 +567,12 @@ class JcSpringMethodApproximationResolver (
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun shouldAnalyzePath(path: String, methods: List<String>, controllerTypeName: String): Boolean {
-        return true
+    private fun shouldAnalyzePath(path: String, handlerName: String, controllerTypeName: String): Boolean {
+        return jcSpringMachineOptions.sessionConfig.pathSubjectsToAnalysis(path, handlerName, controllerTypeName)
     }
 
-    private fun shouldSkipController(controllerType: JcClassOrInterface): Boolean {
-        return controllerType.annotations.any {
-            // TODO: support conditional controllers and dependent conditional beans
-            it.name == "org.springframework.boot.autoconfigure.condition.ConditionalOnProperty"
-        }
+    private fun shouldSkipController(controller: JcClassOrInterface): Boolean {
+        return jcSpringMachineOptions.sessionConfig.controllerForbiddenForAnalysis(controller)
     }
 
     private fun getRequestMappingMethod(annotation: JcAnnotation): String {
@@ -576,7 +584,7 @@ class JcSpringMethodApproximationResolver (
 
     private fun combinePaths(basePath: String, localPath: String): String {
         val controllerPath = "/${basePath.trim('/')}"
-        val handlerPath = "/$localPath".trimStart('/')
+        val handlerPath = "/${localPath.trimStart('/')}"
         val rawCombined = "$controllerPath$handlerPath"
         return rawCombined.replace("//", "/")
     }
@@ -594,7 +602,7 @@ class JcSpringMethodApproximationResolver (
     }
 
     private fun getHandlerData(): List<HandlerMethodData> {
-        val controllerTypes = ctx.cp.classesOfLocations(jcConcreteMachineOptions.projectLocations)
+        val controllerTypes = jcConcreteMachineOptions.userClassesIn(ctx.cp)
             .filter { !it.isAbstract && !it.isInterface && !it.isAnonymous && it.isSpringController }
             .filterNot { shouldSkipController(it) }
 
@@ -621,7 +629,7 @@ class JcSpringMethodApproximationResolver (
     private fun allControllerPaths(stateToFill: JcSpringState): ArrayList<ArrayList<Any>> {
         val handlerData =
             getHandlerData()
-            .filter { shouldAnalyzePath(it.pathTemplate, it.allowedMethods, it.controller.name) }
+            .filter { shouldAnalyzePath(it.pathTemplate, it.handler.jvmSignature, it.controller.name) }
         stateToFill.handlerData = handlerData
 
         return handlerData
@@ -654,10 +662,9 @@ class JcSpringMethodApproximationResolver (
     private fun getTypeOfUser(): Class<*> {
         val userDetailsClass = ctx.cp
             .findClass("org.springframework.security.core.userdetails.UserDetails")
-
         val userClass = runBlocking { ctx.cp.hierarchyExt() }
             .findSubClasses(userDetailsClass, entireHierarchy = true, includeOwn = false)
-            .filter { jcConcreteMachineOptions.projectLocations.contains(it.declaration.location.jcLocation) }
+            .filter { jcConcreteMachineOptions.isUserClass(it) }
             .firstOrNull { !it.name.startsWith("org.springframework.security") }
             ?.toJavaClass(JcConcreteMemoryClassLoader)
 
