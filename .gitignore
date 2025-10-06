@@ -29,9 +29,11 @@ usvm-jvm-spring-runner/DUMP_LAMBDA_PROXY_CLASS_FILES
 # Benchmark-related folder contents
 usvm-jvm-spring-runner/bench-errors/*
 usvm-jvm-spring-runner/bench-logs/*
-usvm-jvm-spring-runner/bench-jars/unpacked/
+usvm-jvm-spring-runner/bench-jars/*
+usvm-jvm-spring-runner/test-dependencies/*
 usvm-jvm-spring-runner/bench-jars/klaw-2.9.0.jar
 usvm-jvm-spring-runner/bench-jars/bench-libs/
+logs/*
 
 *.ansi
 .profileconfig.json
