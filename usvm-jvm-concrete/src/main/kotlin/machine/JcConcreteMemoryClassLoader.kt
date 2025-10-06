@@ -71,9 +71,7 @@ object JcConcreteMemoryClassLoader : SecureClassLoader(ClassLoader.getSystemClas
     private fun JarEntry.matchResource(name: String, single: Boolean): Boolean {
         check(name.isNotEmpty())
         val entryName = this.name
-        return entryName == name
-                || entryName.endsWith(name)
-                || !single && entryName.contains(name + "/")
+        return entryName == name || entryName.trimEnd('/').endsWith(name)
     }
 
     private fun findResourcesInFolder(

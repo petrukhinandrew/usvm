@@ -55,6 +55,8 @@ import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.PathWalkOption
 import kotlin.io.path.extension
 import kotlin.io.path.walk
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.tree.FieldNode
 
 class BenchCp(
     val cp: JcClasspath,
@@ -303,7 +305,6 @@ fun generateTestClass(
                         listOf(
                             "spring.sql.init.mode=never",
                             "spring.jpa.hibernate.ddl-auto=create-drop",
-                            "spring.jpa.defer-datasource-initialization=true"
                         )
                     )
                 )
@@ -312,6 +313,15 @@ fun generateTestClass(
 
             JcSpringTestGenerationMode.SpringJpaTest -> TODO("not supported yet")
         }
+        val mockBeanTypeName = "org.springframework.boot.test.mock.mockito.MockBean"
+        val mockBeanAnnotation = AnnotationNode(mockBeanTypeName.asJvmDescriptor)
+        // TODO: pass from
+        val requiredMocks = mapOf(
+            "clientRecordService" to "com.explyt.audit.client.service.ClientRecordService",
+            "tokenRecordService" to "com.explyt.audit.token.service.TokenRecordService",
+            "clickHouseClient" to "com.clickhouse.client.api.Client"
+        )
+        classNode.fields.addAll(requiredMocks.map { (name, type) -> makeMockField(name, type, mockBeanAnnotation) })
 
         replaceTypeInClassNode(classNode, testClassTemplateName, newTestClassName)
         classNode.write(cp, springDirFile.resolve("$newTestClassSlashName.class").toPath(), checkClass = true)
@@ -362,4 +372,12 @@ fun generateTestClass(
         tablesInfo,
         isNeedTrackTable
     )
+}
+
+val String.asJvmDescriptor: String get() = "L${replace('.', '/')};"
+
+fun makeMockField(fieldName: String, typeName: String, mockBeanAnnotation: AnnotationNode): FieldNode {
+    val field = FieldNode(Opcodes.ACC_PRIVATE, fieldName, typeName.asJvmDescriptor, null, null)
+    field.visibleAnnotations = listOf(mockBeanAnnotation)
+    return field
 }

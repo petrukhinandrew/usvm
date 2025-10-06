@@ -350,6 +350,18 @@ tasks.register<JavaExec>("benchmarkLicenceServer") {
     configureSpringAnalysis(this)
 }
 
+tasks.register<JavaExec>("benchmarkKafkaConsumer") {
+    fillProperties(loadBenchmark("kafka-consumer.jar"), this)
+    mainClass.set("benchmarking.BenchmarkingKt")
+    configureSpringAnalysis(this)
+}
+
+tasks.register<JavaExec>("benchmarkDbApi") {
+    fillProperties(loadBenchmark("dbapi.jar"), this)
+    mainClass.set("benchmarking.BenchmarkingKt")
+    configureSpringAnalysis(this)
+}
+
 tasks.register<JavaExec>("benchmarkBlogApi") {
     fillProperties(loadBenchmark("blogapi-0.0.1-SNAPSHOT.jar"), this)
     mainClass.set("benchmarking.BenchmarkingKt")

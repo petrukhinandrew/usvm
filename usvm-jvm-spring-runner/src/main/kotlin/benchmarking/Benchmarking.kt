@@ -43,6 +43,7 @@ private fun runBenchmark(bench: BenchCp, benchDescription: BenchDescription) {
         exceptionsPropagation = true,
         timeout = Duration.INFINITE,
         solverType = SolverType.YICES,
+        stepLimit = 30_000u,
         loopIterationLimit = 2,
         solverTimeout = Duration.INFINITE, // we do not need the timeout for a solver in tests
         typeOperationsTimeout = Duration.INFINITE, // we do not need the timeout for type operations in tests

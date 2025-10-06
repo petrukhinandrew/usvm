@@ -2,6 +2,10 @@ plugins {
     id("usvm.kotlin-conventions")
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     implementation(project(":usvm-jvm:usvm-jvm-api"))
     implementation(project(":usvm-jvm-concrete"))

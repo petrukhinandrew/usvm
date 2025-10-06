@@ -9,6 +9,10 @@ repositories {
     maven("https://jitpack.io")
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     compileOnly(Libs.jacodb_api_jvm)
 }

@@ -576,7 +576,7 @@ class JcSpringMethodApproximationResolver (
 
     private fun combinePaths(basePath: String, localPath: String): String {
         val controllerPath = "/${basePath.trim('/')}"
-        val handlerPath = "/$localPath".trimStart('/')
+        val handlerPath = "/${localPath.trimStart('/')}"
         val rawCombined = "$controllerPath$handlerPath"
         return rawCombined.replace("//", "/")
     }

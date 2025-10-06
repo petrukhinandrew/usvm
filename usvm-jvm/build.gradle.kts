@@ -4,6 +4,10 @@ plugins {
     id("usvm.kotlin-conventions")
 }
 
+repositories {
+    mavenLocal()
+}
+
 val samples by sourceSets.creating {
     java {
         srcDir("src/samples/java")

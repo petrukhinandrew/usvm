@@ -8,6 +8,10 @@ plugins {
     `maven-publish`
 }
 
+repositories {
+    mavenLocal()
+}
+
 tasks {
     withType<JavaCompile> {
         sourceCompatibility = JavaVersion.VERSION_1_8.toString()
